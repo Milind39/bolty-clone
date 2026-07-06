@@ -3,47 +3,67 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { toast } from "sonner"; // 1. Import toast
 import { BACKEND_URL } from "@/config";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error] = useState("");
   const router = useRouter();
+
+  const heroStyle = {
+    background:
+      "linear-gradient(to bottom, #0a2342 0%, #102a43 35%, #020617 100%)",
+    backgroundColor: "#020617",
+    position: "relative" as const,
+    minHeight: "100vh",
+    width: "100vw",
+    overflow: "hidden",
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!prompt.trim()) {
-      setError("Please enter a project description");
+      toast.error("Input required", {
+        description: "Please enter a project description before continuing.",
+      });
       return;
     }
 
     setIsLoading(true);
-    setError("");
 
     try {
-      // First, determine if it's a React or Node.js project
       const response = await axios.post(`${BACKEND_URL}/template`, {
         prompt: prompt.trim(),
       });
 
-      // Store the prompts in localStorage for use in the Builder page
       localStorage.setItem("projectPrompt", prompt.trim());
       localStorage.setItem("projectType", JSON.stringify(response.data));
 
-      // Navigate to the Builder page with the prompt
+      // Show success toast
+      toast.success("Project template created!", {
+        description: "Navigating to the builder...",
+      });
+
       router.push(`/Builder?prompt=${encodeURIComponent(prompt.trim())}`);
     } catch (err) {
       console.error("Error submitting prompt:", err);
-      setError("Failed to process your request. Please try again.");
+      // Show error toast
+      toast.error("Something went wrong", {
+        description: "Failed to process your request. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen max-w-screen px-0 py-0 overflow-hidden">
+    <main
+      className="relative flex flex-col items-center justify-center max-h-screen max-w-screen px-0 py-0 overflow-hidden"
+      style={heroStyle}
+    >
       {/* Arched white line SVG background */}
       <svg
         className="absolute top-0 left-0 max-w-screen h-[90vh] z-0"
@@ -94,13 +114,13 @@ export default function Home() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe your project..."
-              className="w-full sm:w-2/3 px-6 py-4 rounded-full border border-gray-300 shadow focus:outline-none focus:ring-2 focus:ring-blue-400 text-lg bg-white/30 backdrop-blur-lg text-gray-900 placeholder:text-gray-700"
+              className="w-full sm:w-2/3 px-6 py-4 rounded-full border border-gray-300 shadow focus:outline-none focus:ring-3 focus:ring-blue-400 text-lg bg-white/55 backdrop-blur-3xl text-gray-900 placeholder:text-gray-900 placeholder:text-xl font-semibold"
               disabled={isLoading}
             />
             <button
               type="submit"
-              className={`bg-blue-600/80 text-white font-semibold rounded-full px-8 py-4 text-lg shadow hover:bg-blue-700/90 transition backdrop-blur ${
-                isLoading ? "opacity-70 cursor-not-allowed" : ""
+              className={`bg-blue-600/80 text-white font-semibold rounded-full px-8 py-4 text-lg shadow hover:bg-blue-700/90 transition backdrop-blur-3xl ${
+                isLoading ? "cursor-not-allowed" : ""
               }`}
               disabled={isLoading}
             >
