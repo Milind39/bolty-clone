@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import React from "react";
-import {
-  SignInButton,
-  SignOutButton,
-  SignedIn, // Corrected
-  SignedOut, // Corrected
-  UserButton,
-} from "@clerk/nextjs";
+import { SignInButton, SignOutButton, UserButton } from "@clerk/nextjs";
 
 const Nav = () => {
   return (
@@ -27,23 +21,21 @@ const Nav = () => {
           </Link>
 
           {/* Corrected: Use SignedOut to show login button */}
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button className="text-gray-200 hover:text-blue-400 font-medium transition cursor-pointer">
-                Sign In
-              </button>
-            </SignInButton>
-          </SignedOut>
+
+          <SignInButton mode="modal">
+            <button className="text-gray-200 hover:text-blue-400 font-medium transition cursor-pointer">
+              Sign In
+            </button>
+          </SignInButton>
 
           {/* Corrected: Use SignedIn to show user profile and logout */}
-          <SignedIn>
-            <UserButton />
-            <SignOutButton>
-              <button className="text-gray-200 hover:text-blue-400 font-medium transition cursor-pointer">
-                Sign Out
-              </button>
-            </SignOutButton>
-          </SignedIn>
+
+          <UserButton />
+          <SignOutButton>
+            <button className="text-gray-200 hover:text-blue-400 font-medium transition cursor-pointer">
+              Sign Out
+            </button>
+          </SignOutButton>
         </div>
       </nav>
     </div>
