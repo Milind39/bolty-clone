@@ -1,0 +1,60 @@
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+
+export default function Pricing() {
+  return (
+    <section
+      id="pricing"
+      className="w-full max-w-3xl text-center justify-center container mb-24 mt-32 rounded-2xl shadow-xl px-8 py-16 mx-auto backdrop-blur-md bg-gradient-to-br from-[#e0e7ff] via-[#fff] to-[#2196f3] text-black"
+    >
+      <h2 className="text-4xl md:text-5xl font-extrabold text-black mb-12 tracking-tight drop-shadow-lg">
+        Pricing
+      </h2>
+      <div className="flex flex-col md:flex-row gap-10 justify-center w-full">
+        <Card className="border border-gray-200 rounded-xl p-8 flex flex-col items-center w-full md:w-1/2 shadow-sm backdrop-blur-md bg-white/30">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold mb-2 text-blue-600">
+              Free
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-blue-600 mb-2">$0</div>
+            <ul className="text-gray-700 mb-6 text-base list-disc list-inside">
+              <li>Basic features</li>
+              <li>Community support</li>
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <button className="bg-blue-600/80 text-white px-6 py-2 rounded-full font-semibold hover:bg-blue-700/90 transition shadow backdrop-blur">
+              Get Started
+            </button>
+          </CardFooter>
+        </Card>
+        <Card className="border-2 border-blue-600 rounded-xl p-8 flex flex-col items-center w-full md:w-1/2 shadow-md backdrop-blur-md bg-white/30">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold mb-2 text-blue-600">
+              Pro
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-blue-600 mb-2">$29/mo</div>
+            <ul className="text-gray-700 mb-6 text-base list-disc list-inside">
+              <li>All features</li>
+              <li>Priority support</li>
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <button className="bg-blue-600/80 text-white px-6 py-2 rounded-full font-semibold hover:bg-blue-700/90 transition shadow backdrop-blur">
+              Upgrade
+            </button>
+          </CardFooter>
+        </Card>
+      </div>
+    </section>
+  );
+}
