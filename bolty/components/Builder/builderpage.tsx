@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/router"; // Standardizing on Next.js Router
+import { useRouter } from "next/navigation"; // Standardizing on Next.js Router
 import { Step, FileItem, StepType } from "@/types";
 import axios from "axios";
 import { BACKEND_URL } from "@/config";
@@ -22,6 +22,7 @@ export function Builder() {
   const [llmMessages, setLlmMessages] = useState<
     { role: "user" | "assistant"; content: string }[]
   >([]);
+
   const [loading, setLoading] = useState(false);
   const [templateSet, setTemplateSet] = useState(false);
 
@@ -40,10 +41,16 @@ export function Builder() {
       localStorage.getItem("templateData") || "{}",
     );
 
+    console.log("DEBUG: savedPrompt:", savedPrompt);
+    console.log("DEBUG: templateData:", templateData);
+
+    console.log("DEBUG: Checking guard clause...");
     if (!savedPrompt || !templateData.uiPrompt) {
+      console.log("DEBUG: Guard clause triggered! Redirecting...");
       router.push("/");
       return;
     }
+    console.log("DEBUG: Guard clause passed.");
 
     setPrompt(savedPrompt);
     setTemplateSet(true);
@@ -63,6 +70,11 @@ export function Builder() {
         const response = await axios.post(`${BACKEND_URL}/template`, {
           prompt: savedPrompt,
         });
+        console.log("Template response received:", response.data);
+        if (!response.data || !response.data.uiPrompt) {
+          console.error("CRITICAL: Backend did not return uiPrompt!");
+          return;
+        }
         uiPrompt = response.data.uiPrompt;
         localStorage.setItem("cachedTemplate", JSON.stringify(response.data));
         setSteps(
@@ -71,8 +83,10 @@ export function Builder() {
 
         // Follow up with chat
         const stepsResponse = await axios.post(`${BACKEND_URL}/chat`, {
-          userTask: savedPrompt,
-          boilerplate: uiPrompt,
+          prompt: {
+            userTask: savedPrompt,
+            boilerplate: uiPrompt,
+          },
         });
 
         setSteps((s) => [
@@ -97,6 +111,10 @@ export function Builder() {
   }
 
   useEffect(() => {
+    console.log(
+      "DEBUG: useEffect triggered. isInitialized:",
+      isInitialized.current,
+    );
     if (!isInitialized.current) {
       init();
       isInitialized.current = true;

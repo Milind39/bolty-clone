@@ -1,1 +1,1 @@
-{"root":["./src/constants.ts","./src/index.ts","./src/prompts.ts","./src/stripindents.ts","./src/defaults/node.ts","./src/defaults/react.ts"],"version":"6.0.3"}
+{"root":["./src/constants.ts","./src/index.ts","./src/prompts.ts","./src/stripindents.ts","./src/defaults/node.ts","./src/defaults/react.ts","./src/lib/gemeni.ts","./src/utility/loghelper.ts"],"version":"6.0.3"}

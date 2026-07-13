@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner"; // 1. Import toast
 import { BACKEND_URL } from "@/config";
+import { Builder } from "../Builder/builderpage";
 
 export default function LandingPage() {
   const [prompt, setPrompt] = useState("");
@@ -41,14 +42,14 @@ export default function LandingPage() {
 
       // Save to localStorage so Builder can read it
       localStorage.setItem("projectPrompt", prompt.trim());
-      localStorage.setItem("projectType", JSON.stringify(response.data));
+      localStorage.setItem("templateData", JSON.stringify(response.data));
 
       // Show success toast
       toast.success("Project template created!", {
         description: "Navigating to the builder...",
       });
 
-      router.push(`/Builder?prompt=${encodeURIComponent(prompt.trim())}`);
+      router.push(`/builder`);
     } catch (err) {
       console.error("Error submitting prompt:", err);
       // Show error toast

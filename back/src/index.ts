@@ -3,7 +3,9 @@ import { BASE_PROMPT, getBaseProjectContext, getSystemPrompt } from "./prompts";
 import { reactBasePrompt } from "./defaults/react";
 import{ nodeBasePrompt } from "./defaults/node";
 import express from "express";
+import { callGeminiAndLog } from "./utility/loghelper";
 require("dotenv").config();
+
 
 
 
@@ -21,18 +23,28 @@ app.use(cors());
 /*******************************template***********************/
 
 app.post("/template", async(req, res) => {
-    const prompt = req.body.prompt;
+    const prompt = req.body.prompt.toLowerCase();
     /*****************Below we ask whether its react or node to llm ********************/
-     const response = await client.interactions.create({
-            model: "gemini-3.5-flash",
-            input: [
-                { type: "text", text: prompt },
-            ],
-            system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
-     });
-    console.log(response);
+    //  const response = await callGeminiAndLog({
+    //         model: "gemini-3.5-flash",
+    //         input: [
+    //             { type: "text", text: prompt },
+    //         ],
+    //         system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
+    //  });
+    // console.log(response);
 
-    const answer = response.output_text?.trim().toLowerCase();  // either react or node
+
+
+    // 1. Local Classification (0 cost, instant, no rate limit)
+    let answer = "node"; // Default to node
+    if (prompt.includes("react") || prompt.includes("frontend") || prompt.includes("ui")) {
+        answer = "react";
+    }
+
+    console.log("Classified as:", answer);
+
+    // const answer = response.output_text?.trim().toLowerCase();  // either react or node
     if (answer === "react") {
 
         res.json({
@@ -126,7 +138,7 @@ ${userTask}
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
 
-         const response = await client.interactions.create({
+         const response = await callGeminiAndLog({
             model: "gemini-3.5-flash",
             input: [
                 { type: "text", text: finalPrompt  },
@@ -135,7 +147,7 @@ ${userTask}
              stream: true,
          });
   // 3. Pipe the stream directly to the response
-    for await (const event of response) {
+    for await (const event of (response as any)) {
         if (event.event_type === "step.delta" && event.delta.type === "text") {
             res.write(event.delta.text);
         }

@@ -8,6 +8,7 @@ const prompts_1 = require("./prompts");
 const react_1 = require("./defaults/react");
 const node_1 = require("./defaults/node");
 const express_1 = __importDefault(require("express"));
+const loghelper_1 = require("./utility/loghelper");
 require("dotenv").config();
 // console.log(process.env.GEMENI_API_KEY);
 const ApiKey = process.env.GEMENI_API_KEY || "";
@@ -19,17 +20,23 @@ const cors = require('cors');
 app.use(cors());
 /*******************************template***********************/
 app.post("/template", async (req, res) => {
-    const prompt = req.body.prompt;
+    const prompt = req.body.prompt.toLowerCase();
     /*****************Below we ask whether its react or node to llm ********************/
-    const response = await client.interactions.create({
-        model: "gemini-3.5-flash",
-        input: [
-            { type: "text", text: prompt },
-        ],
-        system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
-    });
-    console.log(response);
-    const answer = response.output_text?.trim().toLowerCase(); // either react or node
+    //  const response = await callGeminiAndLog({
+    //         model: "gemini-3.5-flash",
+    //         input: [
+    //             { type: "text", text: prompt },
+    //         ],
+    //         system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
+    //  });
+    // console.log(response);
+    // 1. Local Classification (0 cost, instant, no rate limit)
+    let answer = "node"; // Default to node
+    if (prompt.includes("react") || prompt.includes("frontend") || prompt.includes("ui")) {
+        answer = "react";
+    }
+    console.log("Classified as:", answer);
+    // const answer = response.output_text?.trim().toLowerCase();  // either react or node
     if (answer === "react") {
         res.json({
             prompt: [prompts_1.BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
@@ -103,7 +110,7 @@ ${userTask}
     // 2. Set headers to allow streaming
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
-    const response = await client.interactions.create({
+    const response = await (0, loghelper_1.callGeminiAndLog)({
         model: "gemini-3.5-flash",
         input: [
             { type: "text", text: finalPrompt },
