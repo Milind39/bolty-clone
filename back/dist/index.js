@@ -14,7 +14,7 @@ const ApiKey = process.env.GEMENI_API_KEY || "";
 const client = new genai.GoogleGenAI({ apiKey: ApiKey });
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-const PORT = 3000;
+const PORT = 5000;
 const cors = require('cors');
 app.use(cors());
 /*******************************template***********************/
