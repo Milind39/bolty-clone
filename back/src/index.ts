@@ -3,7 +3,6 @@ import { BASE_PROMPT, getBaseProjectContext, getSystemPrompt } from "./prompts";
 import { reactBasePrompt } from "./defaults/react";
 import{ nodeBasePrompt } from "./defaults/node";
 import express from "express";
-import fs from "fs";
 require("dotenv").config();
 
 
@@ -12,9 +11,11 @@ require("dotenv").config();
 const ApiKey = process.env.GEMENI_API_KEY || "" ;
 const client = new genai.GoogleGenAI({apiKey: ApiKey});
 
-
 const app = express();
 app.use(express.json());
+const PORT = 5000;
+const cors = require('cors');
+app.use(cors());
 
 
 /*******************************template***********************/
@@ -98,9 +99,10 @@ app.post("/template", async(req, res) => {
 
 /**********************chat***********************/
 
-app.post("/chat", async(req, res)=>{
-    const userTask = req.body.prompt;
-    const prompt = `
+app.post("/chat", async (req, res) => {
+    // FIX: Destructure from req.body, not req.body.prompt
+    const { userTask, boilerplate } = req.body.prompt;
+    const finalPrompt = `
 [INSTRUCTIONS]
 You are an expert developer. You are provided with existing project files 
 within <project_files> tags. Your task is defined within <user_request> tags.
@@ -112,38 +114,45 @@ within <project_files> tags. Your task is defined within <user_request> tags.
   complexity from previous turns unless explicitly asked to modify existing features.
 
 <project_files>
-${getBaseProjectContext()}
+${boilerplate}
 </project_files>
 
 <user_request>
 ${userTask}
 </user_request>
 `;
+    
+    // 2. Set headers to allow streaming
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
          const response = await client.interactions.create({
             model: "gemini-3.5-flash",
             input: [
-                { type: "text", text: prompt  },
+                { type: "text", text: finalPrompt  },
             ],
              system_instruction: getSystemPrompt(),
              stream: true,
          });
-     for await (const event of response) {
-            if (event.event_type === "step.delta") {
-                if (event.delta.type === "text") {
-                    process.stdout.write(event.delta.text);
-                }
-            }
+  // 3. Pipe the stream directly to the response
+    for await (const event of response) {
+        if (event.event_type === "step.delta" && event.delta.type === "text") {
+            res.write(event.delta.text);
         }
+    }
 
         console.log("Stream object received.");
     console.log(response);
 
     res.json({})
+     res.end(); // IMPORTANT: Close the response after streaming finishes
 
 })
 
 
-app.listen(3000);
+app.listen(PORT, () => {
+  console.log(`Backend is running at http://localhost:${PORT}`);
+});
 // async function main() {
 
     /**************NON STREAMED OUTPUT**************/

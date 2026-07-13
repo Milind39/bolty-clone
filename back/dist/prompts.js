@@ -306,4 +306,23 @@ Use stock photos from unsplash where appropriate, only valid URLs you know exist
 `;
 };
 exports.getBaseProjectContext = getBaseProjectContext;
+/***********************Later Update Idea ***********************/
+// export const finalPrompt = (): string => {
+//   return `
+//   [INSTRUCTIONS]
+// You are an expert developer. You are provided with existing project files 
+// within <project_files> tags. Your task is defined within <user_request> tags.
+// - IF the task is simple (like "Create a todo app"), PROVIDE A SIMPLE IMPLEMENTATION.
+// - DO NOT invent complex features, analytics dashboards, or platforms.
+// - Focus ONLY on the requested functionality.
+// - Prioritize <user_request> over any assumptions about the project's purpose.
+// - Treat each <user_request> as a fresh task. Do not carry over architectural 
+//   complexity from previous turns unless explicitly asked to modify existing features.
+// <project_files>
+// ${getBaseProjectContext()}
+// </project_files>
+// <user_request>
+// ${userTask}
+// </user_request>`
+// }
 //# sourceMappingURL=prompts.js.map

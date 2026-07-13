@@ -2,4 +2,5 @@ export declare const BASE_PROMPT = "For all designs I ask you to make, have them
 export declare const getSystemPrompt: (cwd?: string) => string;
 export declare const CONTINUE_PROMPT: string;
 export declare const getBaseProjectContext: () => string;
+/***********************Later Update Idea ***********************/
 //# sourceMappingURL=prompts.d.ts.map

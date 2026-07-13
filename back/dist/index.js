@@ -14,6 +14,10 @@ const ApiKey = process.env.GEMENI_API_KEY || "";
 const client = new genai.GoogleGenAI({ apiKey: ApiKey });
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
+const PORT = 3000;
+const cors = require('cors');
+app.use(cors());
+/*******************************template***********************/
 app.post("/template", async (req, res) => {
     const prompt = req.body.prompt;
     /*****************Below we ask whether its react or node to llm ********************/
@@ -34,7 +38,7 @@ app.post("/template", async (req, res) => {
     }
     else if (answer === "node") {
         res.json({
-            prompt: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+            prompt: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${node_1.nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
             uiPrompt: node_1.nodeBasePrompt
         });
     }
@@ -42,9 +46,42 @@ app.post("/template", async (req, res) => {
         return res.status(403).json({ error: "Invalid project type" });
     }
 });
+/**************************updated template *************************/
+// app.post("/template", async(req, res) => {
+//     const prompt = req.body.prompt;
+//     // ... your LLM classification code ...
+//     const answer = response.output_text?.trim().toLowerCase();
+//     // Helper to wrap the prompt in XML
+//     const wrapInContext = (boilerplate) => `
+// [INSTRUCTIONS]
+// You are starting a NEW project. Ignore all previous project definitions.
+// Use the following boilerplate as the ONLY foundation.
+// <project_files>
+// ${boilerplate}
+// </project_files>
+// <user_request>
+// ${prompt}
+// </user_request>
+// `;
+//     if (answer === "react") {
+//         res.json({
+//             prompt: wrapInContext(reactBasePrompt),
+//             uiPrompt: reactBasePrompt,
+//         });
+//     } else if (answer === "node") {
+//         res.json({
+//             prompt: wrapInContext(nodeBasePrompt), // Fixed: Use nodeBasePrompt here!
+//             uiPrompt: nodeBasePrompt
+//         });
+//     } else {
+//         return res.status(403).json({ error: "Invalid project type" });
+//     }
+// });
+/**********************chat***********************/
 app.post("/chat", async (req, res) => {
-    const userTask = req.body.prompt;
-    const prompt = `
+    // FIX: Destructure from req.body, not req.body.prompt
+    const { userTask, boilerplate } = req.body.prompt;
+    const finalPrompt = `
 [INSTRUCTIONS]
 You are an expert developer. You are provided with existing project files 
 within <project_files> tags. Your task is defined within <user_request> tags.
@@ -56,33 +93,38 @@ within <project_files> tags. Your task is defined within <user_request> tags.
   complexity from previous turns unless explicitly asked to modify existing features.
 
 <project_files>
-${(0, prompts_1.getBaseProjectContext)()}
+${boilerplate}
 </project_files>
 
 <user_request>
 ${userTask}
 </user_request>
 `;
+    // 2. Set headers to allow streaming
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
     const response = await client.interactions.create({
         model: "gemini-3.5-flash",
         input: [
-            { type: "text", text: prompt },
+            { type: "text", text: finalPrompt },
         ],
         system_instruction: (0, prompts_1.getSystemPrompt)(),
         stream: true,
     });
+    // 3. Pipe the stream directly to the response
     for await (const event of response) {
-        if (event.event_type === "step.delta") {
-            if (event.delta.type === "text") {
-                process.stdout.write(event.delta.text);
-            }
+        if (event.event_type === "step.delta" && event.delta.type === "text") {
+            res.write(event.delta.text);
         }
     }
     console.log("Stream object received.");
     console.log(response);
     res.json({});
+    res.end(); // IMPORTANT: Close the response after streaming finishes
 });
-app.listen(3000);
+app.listen(PORT, () => {
+    console.log(`Backend is running at http://localhost:${PORT}`);
+});
 // async function main() {
 /**************NON STREAMED OUTPUT**************/
 // console.log("Stream initialized, waiting for response...");
