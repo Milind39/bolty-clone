@@ -1,5 +1,5 @@
 import genai = require("@google/genai");
-import { BASE_PROMPT, getSystemPrompt } from "./prompts";
+import { BASE_PROMPT, getBaseProjectContext, getSystemPrompt } from "./prompts";
 import { reactBasePrompt } from "./defaults/react";
 import{ nodeBasePrompt } from "./defaults/node";
 import express from "express";
@@ -16,6 +16,9 @@ const client = new genai.GoogleGenAI({apiKey: ApiKey});
 const app = express();
 app.use(express.json());
 
+
+/*******************************template***********************/
+
 app.post("/template", async(req, res) => {
     const prompt = req.body.prompt;
     /*****************Below we ask whether its react or node to llm ********************/
@@ -26,7 +29,7 @@ app.post("/template", async(req, res) => {
             ],
             system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
      });
-    console.log(response.output_text);
+    console.log(response);
 
     const answer = response.output_text?.trim().toLowerCase();  // either react or node
     if (answer === "react") {
@@ -40,7 +43,7 @@ app.post("/template", async(req, res) => {
     else if (answer === "node") {
     
         res.json({
-            prompt: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+            prompt: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
             uiPrompt: nodeBasePrompt
         });
     
@@ -51,12 +54,93 @@ app.post("/template", async(req, res) => {
     }
 
 
-
-
-
-
-
 });
+
+/**************************updated template *************************/
+// app.post("/template", async(req, res) => {
+//     const prompt = req.body.prompt;
+    
+//     // ... your LLM classification code ...
+//     const answer = response.output_text?.trim().toLowerCase();
+
+//     // Helper to wrap the prompt in XML
+//     const wrapInContext = (boilerplate) => `
+// [INSTRUCTIONS]
+// You are starting a NEW project. Ignore all previous project definitions.
+// Use the following boilerplate as the ONLY foundation.
+
+// <project_files>
+// ${boilerplate}
+// </project_files>
+
+// <user_request>
+// ${prompt}
+// </user_request>
+// `;
+
+//     if (answer === "react") {
+//         res.json({
+//             prompt: wrapInContext(reactBasePrompt),
+//             uiPrompt: reactBasePrompt,
+//         });
+//     } else if (answer === "node") {
+//         res.json({
+//             prompt: wrapInContext(nodeBasePrompt), // Fixed: Use nodeBasePrompt here!
+//             uiPrompt: nodeBasePrompt
+//         });
+//     } else {
+//         return res.status(403).json({ error: "Invalid project type" });
+//     }
+// });
+
+
+
+
+/**********************chat***********************/
+
+app.post("/chat", async(req, res)=>{
+    const userTask = req.body.prompt;
+    const prompt = `
+[INSTRUCTIONS]
+You are an expert developer. You are provided with existing project files 
+within <project_files> tags. Your task is defined within <user_request> tags.
+- IF the task is simple (like "Create a todo app"), PROVIDE A SIMPLE IMPLEMENTATION.
+- DO NOT invent complex features, analytics dashboards, or platforms.
+- Focus ONLY on the requested functionality.
+- Prioritize <user_request> over any assumptions about the project's purpose.
+- Treat each <user_request> as a fresh task. Do not carry over architectural 
+  complexity from previous turns unless explicitly asked to modify existing features.
+
+<project_files>
+${getBaseProjectContext()}
+</project_files>
+
+<user_request>
+${userTask}
+</user_request>
+`;
+         const response = await client.interactions.create({
+            model: "gemini-3.5-flash",
+            input: [
+                { type: "text", text: prompt  },
+            ],
+             system_instruction: getSystemPrompt(),
+             stream: true,
+         });
+     for await (const event of response) {
+            if (event.event_type === "step.delta") {
+                if (event.delta.type === "text") {
+                    process.stdout.write(event.delta.text);
+                }
+            }
+        }
+
+        console.log("Stream object received.");
+    console.log(response);
+
+    res.json({})
+
+})
 
 
 app.listen(3000);
@@ -86,15 +170,15 @@ app.listen(3000);
 //             system_instruction: getSystemPrompt(),
 //             stream: true,
 //         });
-//         for await (const event of stream) {
-//             if (event.event_type === "step.delta") {
-//                 if (event.delta.type === "text") {
-//                     process.stdout.write(event.delta.text);
-//                 }
-//             }
-//         }
+        // for await (const event of stream) {
+        //     if (event.event_type === "step.delta") {
+        //         if (event.delta.type === "text") {
+        //             process.stdout.write(event.delta.text);
+        //         }
+        //     }
+        // }
 
-//         console.log("Stream object received.");
+        // console.log("Stream object received.");
 //     }
 //     catch (error) {
 //     console.error("Error during interaction:", error);

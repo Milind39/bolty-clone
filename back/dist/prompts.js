@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CONTINUE_PROMPT = exports.getSystemPrompt = exports.BASE_PROMPT = void 0;
+exports.getBaseProjectContext = exports.CONTINUE_PROMPT = exports.getSystemPrompt = exports.BASE_PROMPT = void 0;
 const constants_1 = require("./constants");
 const stripindents_1 = require("./stripindents");
 exports.BASE_PROMPT = "For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.\n\nBy default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.\n\nUse icons from lucide-react for logos.\n\nUse stock photos from unsplash where appropriate, only valid URLs you know exist. Do not download the images, only link to them in image tags.\n\n";
@@ -284,4 +284,26 @@ exports.CONTINUE_PROMPT = (0, stripindents_1.stripIndents) `
   Continue your prior response. IMPORTANT: Immediately begin from where you left off without any interruptions.
   Do not repeat any content, including artifact and action tags.
 `;
+const getBaseProjectContext = () => {
+    return `
+Here is an artifact that contains all files of the project visible to you.
+Consider the contents of ALL files in the project.
+
+<boltArtifact id="project-import" title="Project Files">
+  </boltArtifact>
+
+Here is a list of files that exist on the file system but are not being shown to you:
+ - .gitignore
+ - package-lock.json
+
+For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.
+
+By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.
+
+Use icons from lucide-react for logos.
+
+Use stock photos from unsplash where appropriate, only valid URLs you know exist. Do not download the images, only link to them in image tags.
+`;
+};
+exports.getBaseProjectContext = getBaseProjectContext;
 //# sourceMappingURL=prompts.js.map

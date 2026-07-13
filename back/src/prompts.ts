@@ -284,3 +284,51 @@ export const CONTINUE_PROMPT = stripIndents`
   Continue your prior response. IMPORTANT: Immediately begin from where you left off without any interruptions.
   Do not repeat any content, including artifact and action tags.
 `;
+
+
+export const getBaseProjectContext = (): string => {
+  return `
+Here is an artifact that contains all files of the project visible to you.
+Consider the contents of ALL files in the project.
+
+<boltArtifact id="project-import" title="Project Files">
+  </boltArtifact>
+
+Here is a list of files that exist on the file system but are not being shown to you:
+ - .gitignore
+ - package-lock.json
+
+For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.
+
+By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.
+
+Use icons from lucide-react for logos.
+
+Use stock photos from unsplash where appropriate, only valid URLs you know exist. Do not download the images, only link to them in image tags.
+`;
+};
+
+
+
+/***********************Later Update Idea ***********************/
+
+// export const finalPrompt = (): string => {
+//   return `
+//   [INSTRUCTIONS]
+// You are an expert developer. You are provided with existing project files 
+// within <project_files> tags. Your task is defined within <user_request> tags.
+// - IF the task is simple (like "Create a todo app"), PROVIDE A SIMPLE IMPLEMENTATION.
+// - DO NOT invent complex features, analytics dashboards, or platforms.
+// - Focus ONLY on the requested functionality.
+// - Prioritize <user_request> over any assumptions about the project's purpose.
+// - Treat each <user_request> as a fresh task. Do not carry over architectural 
+//   complexity from previous turns unless explicitly asked to modify existing features.
+
+// <project_files>
+// ${getBaseProjectContext()}
+// </project_files>
+
+// <user_request>
+// ${userTask}
+// </user_request>`
+// }
