@@ -12,8 +12,10 @@ import { TabView } from "@/components/TabView";
 import { CodeEditor } from "@/components/CodeEditor";
 import { PreviewFrame } from "@/components/PreviewFrame";
 import { useWebContainer } from "@/hooks/useWebContainers";
-import { parseXml } from "@/steps";
+
 import { WebContainer } from "@webcontainer/api";
+import { parseXml } from "@/utils/steps";
+import { toast } from "sonner";
 
 export function Builder() {
   const router = useRouter();
@@ -42,23 +44,16 @@ export function Builder() {
       localStorage.getItem("templateData") || "{}",
     );
 
-    console.log("DEBUG: savedPrompt:", savedPrompt);
-    console.log("DEBUG: templateData:", templateData);
-
-    console.log("DEBUG: Checking guard clause...");
     if (!savedPrompt || !templateData.uiPrompt) {
-      console.log("DEBUG: Guard clause triggered! Redirecting...");
       router.push("/");
       return;
     }
-    console.log("DEBUG: Guard clause passed.");
 
     setPrompt(savedPrompt);
     setTemplateSet(true);
 
     let uiPrompt = "";
 
-    // 2. Only fetch if not in cache
     if (cachedTemplate) {
       const data = JSON.parse(cachedTemplate);
       uiPrompt = data.uiPrompt;
@@ -68,45 +63,50 @@ export function Builder() {
     } else {
       setLoading(true);
       try {
+        // 1. Fetch Template
         const response = await axios.post(`${BACKEND_URL}/template`, {
           prompt: savedPrompt,
         });
-        console.log("Template response received:", response.data);
-        if (!response.data || !response.data.uiPrompt) {
-          console.error("CRITICAL: Backend did not return uiPrompt!");
-          return;
-        }
         uiPrompt = response.data.uiPrompt;
         localStorage.setItem("cachedTemplate", JSON.stringify(response.data));
         setSteps(
           parseXml(uiPrompt).map((x: Step) => ({ ...x, status: "pending" })),
         );
 
-        // Follow up with chat
-        const stepsResponse = await axios.post(`${BACKEND_URL}/chat`, {
-          prompt: {
-            userTask: savedPrompt,
-            boilerplate: uiPrompt,
-          },
+        // 2. Fetch Chat via Stream
+        const chatResponse = await fetch(`${BACKEND_URL}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: { userTask: savedPrompt, boilerplate: uiPrompt },
+          }),
         });
 
-        // Defensive check
-        if (stepsResponse?.data?.response) {
-          setSteps((s) => [
-            ...s,
-            ...parseXml(stepsResponse.data.response).map((x) => ({
-              ...x,
-              status: "pending" as const,
-            })),
-          ]);
-        } else {
-          console.error("Invalid response from /chat:", stepsResponse);
+        if (!chatResponse.body) throw new Error("No response body");
+
+        const reader = chatResponse.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullResponse += decoder.decode(value, { stream: true });
         }
+
+        // 3. Process the full XML response
+        const newSteps = parseXml(fullResponse);
+        setSteps((s) => [
+          ...s,
+          ...newSteps.map((x) => ({ ...x, status: "pending" as const })),
+        ]);
+
         setLlmMessages([
           { role: "user", content: savedPrompt },
-          { role: "assistant", content: stepsResponse.data.response },
+          { role: "assistant", content: fullResponse },
         ]);
       } catch (err: any) {
+        console.error("Initialization error:", err);
         if (err.response?.status === 429) {
           alert("Rate limit exceeded. Please wait 1 minute before refreshing.");
         }
@@ -161,22 +161,21 @@ export function Builder() {
     const count = parseInt(localStorage.getItem("req_count") || "0") + 1;
     localStorage.setItem("req_count", count.toString());
     console.log(`Total frontend requests: ${count}`);
+
+    // Warn the user when they are getting close to the limit
+    if (count >= 18) {
+      console.warn("You are approaching your free tier limit!");
+    }
   };
 
   // 3. User Interaction (Send Button)
   const handleSendMessage = async () => {
+    trackRequest();
     if (!userPrompt.trim()) return;
 
     setLoading(true);
-    const newMessage = { role: "user" as const, content: userPrompt };
-    const updatedMessages = [...llmMessages, newMessage];
-
-    // Retrieve the cached uiPrompt to serve as the boilerplate context
-    const cachedTemplate = localStorage.getItem("cachedTemplate");
-    const boilerplate = cachedTemplate
-      ? JSON.parse(cachedTemplate).uiPrompt
-      : "";
-
+    const userMsg = { role: "user" as const, content: userPrompt };
+    setLlmMessages((prev) => [...prev, userMsg]);
     setUserPrompt("");
 
     try {
@@ -186,11 +185,24 @@ export function Builder() {
         body: JSON.stringify({
           prompt: {
             userTask: userPrompt,
-            boilerplate: boilerplate,
+            boilerplate: localStorage.getItem("cachedTemplate")
+              ? JSON.parse(localStorage.getItem("cachedTemplate")!).uiPrompt
+              : "",
           },
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        // TRIGGER THE TOAST HERE
+        if (errorData.code === "too_many_requests") {
+          toast.warning("Rate limit reached", {
+            description:
+              "You've hit the free tier limit. Please wait about a minute before trying again.",
+          });
+        }
+        return;
+      }
       if (!response.body) throw new Error("No response body");
 
       const reader = response.body.getReader();
@@ -203,34 +215,69 @@ export function Builder() {
 
         const chunk = decoder.decode(value, { stream: true });
         fullResponse += chunk;
+
+        // IF STREAMING ERROR:
+        // When you detect the error chunk in your while loop:
+        if (fullResponse.includes("high demand")) {
+          toast.error("Capacity Limit Reached", {
+            description:
+              "Gemini is experiencing high demand. Please try again in a moment.",
+          });
+          return;
+        }
+        // Check if backend sent an error signal
+        if (chunk.includes("error")) {
+          console.error("Stream reported error:", chunk);
+          throw new Error("AI Service is currently busy. Please try again.");
+        }
       }
 
-      setLlmMessages([
-        ...updatedMessages,
+      // Process final response
+      const newSteps = parseXml(fullResponse);
+      setSteps((s) => [
+        ...s,
+        ...newSteps.map((x) => ({ ...x, status: "pending" as const })),
+      ]);
+      setLlmMessages((prev) => [
+        ...prev,
         { role: "assistant", content: fullResponse },
       ]);
 
-      setSteps((s) => [
-        ...s,
-        ...parseXml(fullResponse).map((x) => ({
-          ...x,
-          status: "pending" as const,
-        })),
-      ]);
-    } catch (err) {
+      // Update Files
+      const newFiles = newSteps
+        .filter((step) => step.type === StepType.CreateFile)
+        .map((step) => ({
+          name: step.path?.split("/").pop() || "file",
+          path: step.path || "",
+          type: "file" as const,
+          content: step.code || "",
+        }));
+
+      setFiles((prev) => {
+        const map = new Map(prev.map((f) => [f.path, f]));
+        newFiles.forEach((f) => map.set(f.path, f));
+        return Array.from(map.values());
+      });
+    } catch (err: any) {
       console.error("Chat error:", err);
+      alert(err.message || "An error occurred while processing your request.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-semibold text-gray-100">Website Builder</h1>
-        <p className="text-sm text-gray-400">Prompt: {prompt}</p>
-      </header>
+  const heroStyle = {
+    background:
+      "linear-gradient(to bottom, #0a2342 0%, #102a43 35%, #020617 100%)",
+    backgroundColor: "#020617",
+    position: "relative" as const,
+    minHeight: "100vh",
+    width: "100vw",
+    overflow: "hidden",
+  };
 
+  return (
+    <div className="min-h-screen bg-gray-900 flex flex-col" style={heroStyle}>
       <div className="flex-1 overflow-hidden grid grid-cols-4 gap-6 p-6">
         <div className="col-span-1 space-y-6 overflow-auto">
           <StepsList

@@ -155,22 +155,42 @@ ${userTask}
 
         // 3. Pipe the stream directly to the response
         for await (const event of (response as any)) {
+            console.log("Processing event type:", event.event_type); // Debugging line
             console.log("event recieved:", event);
+            // 1. ADD THIS: Check for API-level errors
+            if (event.event_type === "error") {
+                console.error("Gemini API stream error:", event.error);
+                // Send the specific error message to the client
+                // Write a JSON error message to the stream
+                res.write(JSON.stringify({
+                    error: true,
+                    message: event.error.message || "Unknown API Error"
+                }));
+                break; // Stop the loop
+            }
             if (event.event_type === "step.delta" && event.delta.type === "text") {
                 res.write(event.delta.text);
             }
         }
-         console.log("Stream object received.");
-            console.log(response);
+        console.log("Stream object received.");
+        console.log(response);
     }
-        catch (error) {
-            console.error("Streaming error:", error);
-            res.status(500).write("Error during streaming");
-        } finally {
-            res.end(); // IMPORTANT: Close the response after streaming finishes
-
+    catch (error) {
+        console.error("Fatal Stream Exception:", error);
+    
+        // Only attempt to set the status if headers haven't been sent yet
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Internal Server Error" });
+        } else {
+            // Headers are already sent (we are in the middle of a stream),
+            // so we cannot change the status code to 500.
+            // We send a signal via the stream instead.
+            res.write(JSON.stringify({ error: true, message: "Stream interrupted due to server error" }));
         }
-    })
+    } finally {
+        res.end(); // Always ensure the response is closed
+    }
+});
 
 
 app.listen(PORT, () => {

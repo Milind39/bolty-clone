@@ -33,7 +33,7 @@ export default function RootLayout({
         <ClerkProvider>
           <Nav />
           <main>{children}</main>
-          <Toaster richColors />
+          <Toaster richColors position="top-right" />
         </ClerkProvider>
       </body>
     </html>

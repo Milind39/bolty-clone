@@ -13,6 +13,7 @@ const Nav = () => {
       <nav className="w-full flex justify-between items-center px-8 py-3 bg-black bg-gradient-to-b-gray border-0 min-h-[48px]">
         <div className="text-2xl font-bold tracking-tight text-gray-100">
           <Link href="/">Bolty</Link>
+          <span className="text-sm">.old</span>
         </div>
 
         <div className="flex items-center gap-8">

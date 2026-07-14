@@ -408,7 +408,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;
@@ -936,7 +936,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;
@@ -1438,7 +1438,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;
