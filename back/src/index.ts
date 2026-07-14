@@ -5,9 +5,8 @@ import{ nodeBasePrompt } from "./defaults/node";
 import express from "express";
 import { callGeminiAndLog } from "./utility/loghelper";
 require("dotenv").config();
-
-
-
+import morgan from 'morgan';
+import cors from 'cors';
 
 // console.log(process.env.GEMENI_API_KEY);
 const ApiKey = process.env.GEMENI_API_KEY || "" ;
@@ -16,9 +15,10 @@ const client = new genai.GoogleGenAI({apiKey: ApiKey});
 const app = express();
 app.use(express.json());
 const PORT = 5000;
-const cors = require('cors');
 app.use(cors());
+app.use(morgan("combined")) // This logs every single request automatically
 
+let requestCount = 0; // Global counter
 
 /*******************************template***********************/
 
@@ -112,6 +112,8 @@ app.post("/template", async(req, res) => {
 /**********************chat***********************/
 
 app.post("/chat", async (req, res) => {
+    requestCount++;
+    console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
     // FIX: Destructure from req.body, not req.body.prompt
     const { userTask, boilerplate } = req.body.prompt;
     const finalPrompt = `
@@ -137,29 +139,38 @@ ${userTask}
     // 2. Set headers to allow streaming
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
-
-         const response = await callGeminiAndLog({
+    try {
+        const response = await callGeminiAndLog({
             model: "gemini-3.5-flash",
             input: [
-                { type: "text", text: finalPrompt  },
+                { type: "text", text: finalPrompt },
             ],
-             system_instruction: getSystemPrompt(),
-             stream: true,
-         });
-  // 3. Pipe the stream directly to the response
-    for await (const event of (response as any)) {
-        if (event.event_type === "step.delta" && event.delta.type === "text") {
-            res.write(event.delta.text);
+            system_instruction: getSystemPrompt(),
+            stream: true,
+        });
+
+        console.log("Stream object type:", typeof response);
+        // If this logs 'object' but you can't iterate over it, it might not be a standard AsyncIterable.
+
+
+        // 3. Pipe the stream directly to the response
+        for await (const event of (response as any)) {
+            console.log("event recieved:", event);
+            if (event.event_type === "step.delta" && event.delta.type === "text") {
+                res.write(event.delta.text);
+            }
         }
+         console.log("Stream object received.");
+            console.log(response);
     }
+        catch (error) {
+            console.error("Streaming error:", error);
+            res.status(500).write("Error during streaming");
+        } finally {
+            res.end(); // IMPORTANT: Close the response after streaming finishes
 
-        console.log("Stream object received.");
-    console.log(response);
-
-    res.json({})
-     res.end(); // IMPORTANT: Close the response after streaming finishes
-
-})
+        }
+    })
 
 
 app.listen(PORT, () => {

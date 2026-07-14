@@ -16,9 +16,12 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "morgan": "^1.11.0",
     "typescript": "^6.0.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^26.1.0"
   }
 }

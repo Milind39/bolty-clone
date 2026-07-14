@@ -13,6 +13,7 @@ import { CodeEditor } from "@/components/CodeEditor";
 import { PreviewFrame } from "@/components/PreviewFrame";
 import { useWebContainer } from "@/hooks/useWebContainers";
 import { parseXml } from "@/steps";
+import { WebContainer } from "@webcontainer/api";
 
 export function Builder() {
   const router = useRouter();
@@ -89,13 +90,18 @@ export function Builder() {
           },
         });
 
-        setSteps((s) => [
-          ...s,
-          ...parseXml(stepsResponse.data.response).map((x) => ({
-            ...x,
-            status: "pending" as "pending",
-          })),
-        ]);
+        // Defensive check
+        if (stepsResponse?.data?.response) {
+          setSteps((s) => [
+            ...s,
+            ...parseXml(stepsResponse.data.response).map((x) => ({
+              ...x,
+              status: "pending" as const,
+            })),
+          ]);
+        } else {
+          console.error("Invalid response from /chat:", stepsResponse);
+        }
         setLlmMessages([
           { role: "user", content: savedPrompt },
           { role: "assistant", content: stepsResponse.data.response },
@@ -122,53 +128,100 @@ export function Builder() {
   }, []);
   // 2. File System Syncing (WebContainer Mount)
   useEffect(() => {
-    if (!webcontainer || files.length === 0) return;
+    if (!WebContainer || files.length === 0) return;
 
-    const createMountStructure = (files: FileItem[]): Record<string, any> => {
-      const mountStructure: Record<string, any> = {};
-      const processFile = (file: FileItem, isRoot: boolean) => {
+    const createMountStructure = (files: FileItem[]): any => {
+      const mountStructure: any = {};
+
+      files.forEach((file) => {
         if (file.type === "folder") {
           mountStructure[file.name] = {
-            directory: file.children
-              ? Object.fromEntries(
-                  file.children.map((c) => [c.name, processFile(c, false)]),
-                )
-              : {},
+            directory: file.children ? createMountStructure(file.children) : {},
           };
         } else {
-          return { file: { contents: file.content || "" } };
+          mountStructure[file.name] = {
+            file: {
+              contents: file.content || "",
+            },
+          };
         }
-        return mountStructure[file.name];
-      };
-      files.forEach((f) => processFile(f, true));
+      });
+
       return mountStructure;
     };
+    const webcontainer = useWebContainer();
+    // Now 'webcontainer' refers to the actual instance returned by the hook
+    if (!webcontainer || files.length === 0) return;
 
     webcontainer.mount(createMountStructure(files));
   }, [files, webcontainer]);
 
+  // Simple helper for logging
+  const trackRequest = () => {
+    const count = parseInt(localStorage.getItem("req_count") || "0") + 1;
+    localStorage.setItem("req_count", count.toString());
+    console.log(`Total frontend requests: ${count}`);
+  };
+
   // 3. User Interaction (Send Button)
   const handleSendMessage = async () => {
+    if (!userPrompt.trim()) return;
+
     setLoading(true);
     const newMessage = { role: "user" as const, content: userPrompt };
+    const updatedMessages = [...llmMessages, newMessage];
 
-    const stepsResponse = await axios.post(`${BACKEND_URL}/chat`, {
-      messages: [...llmMessages, newMessage],
-    });
+    // Retrieve the cached uiPrompt to serve as the boilerplate context
+    const cachedTemplate = localStorage.getItem("cachedTemplate");
+    const boilerplate = cachedTemplate
+      ? JSON.parse(cachedTemplate).uiPrompt
+      : "";
 
-    setLoading(false);
-    setLlmMessages([
-      ...llmMessages,
-      newMessage,
-      { role: "assistant", content: stepsResponse.data.response },
-    ]);
-    setSteps((s) => [
-      ...s,
-      ...parseXml(stepsResponse.data.response).map((x) => ({
-        ...x,
-        status: "pending" as const,
-      })),
-    ]);
+    setUserPrompt("");
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: {
+            userTask: userPrompt,
+            boilerplate: boilerplate,
+          },
+        }),
+      });
+
+      if (!response.body) throw new Error("No response body");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullResponse += chunk;
+      }
+
+      setLlmMessages([
+        ...updatedMessages,
+        { role: "assistant", content: fullResponse },
+      ]);
+
+      setSteps((s) => [
+        ...s,
+        ...parseXml(fullResponse).map((x) => ({
+          ...x,
+          status: "pending" as const,
+        })),
+      ]);
+    } catch (err) {
+      console.error("Chat error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

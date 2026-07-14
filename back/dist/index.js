@@ -10,14 +10,17 @@ const node_1 = require("./defaults/node");
 const express_1 = __importDefault(require("express"));
 const loghelper_1 = require("./utility/loghelper");
 require("dotenv").config();
+const morgan_1 = __importDefault(require("morgan"));
+const cors_1 = __importDefault(require("cors"));
 // console.log(process.env.GEMENI_API_KEY);
 const ApiKey = process.env.GEMENI_API_KEY || "";
 const client = new genai.GoogleGenAI({ apiKey: ApiKey });
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 const PORT = 5000;
-const cors = require('cors');
-app.use(cors());
+app.use((0, cors_1.default)());
+app.use((0, morgan_1.default)("combined")); // This logs every single request automatically
+let requestCount = 0; // Global counter
 /*******************************template***********************/
 app.post("/template", async (req, res) => {
     const prompt = req.body.prompt.toLowerCase();
@@ -86,6 +89,8 @@ app.post("/template", async (req, res) => {
 // });
 /**********************chat***********************/
 app.post("/chat", async (req, res) => {
+    requestCount++;
+    console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
     // FIX: Destructure from req.body, not req.body.prompt
     const { userTask, boilerplate } = req.body.prompt;
     const finalPrompt = `
@@ -110,24 +115,34 @@ ${userTask}
     // 2. Set headers to allow streaming
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
-    const response = await (0, loghelper_1.callGeminiAndLog)({
-        model: "gemini-3.5-flash",
-        input: [
-            { type: "text", text: finalPrompt },
-        ],
-        system_instruction: (0, prompts_1.getSystemPrompt)(),
-        stream: true,
-    });
-    // 3. Pipe the stream directly to the response
-    for await (const event of response) {
-        if (event.event_type === "step.delta" && event.delta.type === "text") {
-            res.write(event.delta.text);
+    try {
+        const response = await (0, loghelper_1.callGeminiAndLog)({
+            model: "gemini-3.5-flash",
+            input: [
+                { type: "text", text: finalPrompt },
+            ],
+            system_instruction: (0, prompts_1.getSystemPrompt)(),
+            stream: true,
+        });
+        console.log("Stream object type:", typeof response);
+        // If this logs 'object' but you can't iterate over it, it might not be a standard AsyncIterable.
+        // 3. Pipe the stream directly to the response
+        for await (const event of response) {
+            console.log("event recieved:", event);
+            if (event.event_type === "step.delta" && event.delta.type === "text") {
+                res.write(event.delta.text);
+            }
         }
+        console.log("Stream object received.");
+        console.log(response);
     }
-    console.log("Stream object received.");
-    console.log(response);
-    res.json({});
-    res.end(); // IMPORTANT: Close the response after streaming finishes
+    catch (error) {
+        console.error("Streaming error:", error);
+        res.status(500).write("Error during streaming");
+    }
+    finally {
+        res.end(); // IMPORTANT: Close the response after streaming finishes
+    }
 });
 app.listen(PORT, () => {
     console.log(`Backend is running at http://localhost:${PORT}`);
