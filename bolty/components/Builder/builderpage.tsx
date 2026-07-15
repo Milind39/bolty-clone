@@ -34,9 +34,8 @@ export function Builder() {
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]); // 1. Data Initialization
 
-  // 1. Data Initialization
   async function init() {
     const savedPrompt = localStorage.getItem("projectPrompt");
     const cachedTemplate = localStorage.getItem("cachedTemplate");
@@ -71,9 +70,8 @@ export function Builder() {
         localStorage.setItem("cachedTemplate", JSON.stringify(response.data));
         setSteps(
           parseXml(uiPrompt).map((x: Step) => ({ ...x, status: "pending" })),
-        );
+        ); // 2. Fetch Chat via Stream
 
-        // 2. Fetch Chat via Stream
         const chatResponse = await fetch(`${BACKEND_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -92,9 +90,8 @@ export function Builder() {
           const { done, value } = await reader.read();
           if (done) break;
           fullResponse += decoder.decode(value, { stream: true });
-        }
+        } // 3. Process the full XML response
 
-        // 3. Process the full XML response
         const newSteps = parseXml(fullResponse);
         setSteps((s) => [
           ...s,
@@ -125,8 +122,7 @@ export function Builder() {
       init();
       isInitialized.current = true;
     }
-  }, []);
-  // 2. File System Syncing (WebContainer Mount)
+  }, []); // 2. File System Syncing (WebContainer Mount)
   useEffect(() => {
     if (!WebContainer || files.length === 0) return;
 
@@ -149,26 +145,22 @@ export function Builder() {
 
       return mountStructure;
     };
-    const webcontainer = useWebContainer();
-    // Now 'webcontainer' refers to the actual instance returned by the hook
+    const webcontainer = useWebContainer(); // Now 'webcontainer' refers to the actual instance returned by the hook
     if (!webcontainer || files.length === 0) return;
 
     webcontainer.mount(createMountStructure(files));
-  }, [files, webcontainer]);
+  }, [files, webcontainer]); // Simple helper for logging
 
-  // Simple helper for logging
   const trackRequest = () => {
     const count = parseInt(localStorage.getItem("req_count") || "0") + 1;
     localStorage.setItem("req_count", count.toString());
-    console.log(`Total frontend requests: ${count}`);
+    console.log(`Total frontend requests: ${count}`); // Warn the user when they are getting close to the limit
 
-    // Warn the user when they are getting close to the limit
     if (count >= 18) {
       console.warn("You are approaching your free tier limit!");
     }
-  };
+  }; // 3. User Interaction (Send Button)
 
-  // 3. User Interaction (Send Button)
   const handleSendMessage = async () => {
     trackRequest();
     if (!userPrompt.trim()) return;
@@ -193,8 +185,7 @@ export function Builder() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        // TRIGGER THE TOAST HERE
+        const errorData = await response.json(); // TRIGGER THE TOAST HERE
         if (errorData.code === "too_many_requests") {
           toast.warning("Rate limit reached", {
             description:
@@ -214,25 +205,22 @@ export function Builder() {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        fullResponse += chunk;
-
-        // IF STREAMING ERROR:
+        fullResponse += chunk; // IF STREAMING ERROR:
         // When you detect the error chunk in your while loop:
+
         if (fullResponse.includes("high demand")) {
           toast.error("Capacity Limit Reached", {
             description:
               "Gemini is experiencing high demand. Please try again in a moment.",
           });
           return;
-        }
-        // Check if backend sent an error signal
+        } // Check if backend sent an error signal
         if (chunk.includes("error")) {
           console.error("Stream reported error:", chunk);
           throw new Error("AI Service is currently busy. Please try again.");
         }
-      }
+      } // Process final response
 
-      // Process final response
       const newSteps = parseXml(fullResponse);
       setSteps((s) => [
         ...s,
@@ -241,9 +229,8 @@ export function Builder() {
       setLlmMessages((prev) => [
         ...prev,
         { role: "assistant", content: fullResponse },
-      ]);
+      ]); // Update Files
 
-      // Update Files
       const newFiles = newSteps
         .filter((step) => step.type === StepType.CreateFile)
         .map((step) => ({
@@ -292,6 +279,7 @@ export function Builder() {
                 onChange={(e) => setUserPrompt(e.target.value)}
                 className="w-full p-2"
               />
+
               <button
                 onClick={handleSendMessage}
                 className="bg-purple-600 px-4 text-white"

@@ -7,11 +7,11 @@ export enum StepType {
 }
 
 export interface Step {
-  id: number;
+  id: string;
   title: string;
   description: string;
   type: StepType;
-  status: 'pending' | 'in-progress' | 'completed';
+  status: 'pending' | 'completed' | 'in-progress';
   code?: string;
   path?: string;
 }

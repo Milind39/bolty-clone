@@ -17,6 +17,7 @@ export function CodeEditor({ file }: CodeEditorProps) {
 
   return (
     <Editor
+      key={file.path}
       height="100%"
       defaultLanguage="typescript"
       theme="vs-dark"
