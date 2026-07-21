@@ -1,25 +1,21 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation"; // Standardizing on Next.js Router
+import { useRouter } from "next/navigation";
 import { Step, FileItem, StepType } from "@/types";
 import axios from "axios";
 import { BACKEND_URL } from "@/config";
 import { StepsList } from "@/components/StepsList";
-import { Loader } from "@/components/Loader";
 import { FileExplorer } from "@/components/FileExplorer";
 import { TabView } from "@/components/TabView";
 import { CodeEditor } from "@/components/CodeEditor";
-import { PreviewFrame } from "@/components/PreviewFrame";
-import { useWebContainer } from "@/hooks/useWebContainers";
-
-import { WebContainer } from "@webcontainer/api";
 import { parseXml } from "@/utils/steps";
 import { toast } from "sonner";
+import { parseBoltArtifacts } from "@/utils/parseBoltStream";
 
 export function Builder() {
   const router = useRouter();
-  const isInitialized = useRef(false); // Prevents double-firing in Strict Mode
+  const isInitialized = useRef(false);
   const [prompt, setPrompt] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [llmMessages, setLlmMessages] = useState<
@@ -28,13 +24,48 @@ export function Builder() {
 
   const [loading, setLoading] = useState(false);
   const [templateSet, setTemplateSet] = useState(false);
+  const [files, setFiles] = useState<FileItem[]>([]);
 
-  const webcontainer = useWebContainer();
   const [currentStep, setCurrentStep] = useState(1);
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [files, setFiles] = useState<FileItem[]>([]); // 1. Data Initialization
+
+  // Helper function to safely detect and throw API errors from stream text
+  const checkForApiError = (text: string) => {
+    try {
+      // Check if text contains JSON or partial JSON with api_error
+      if (text.includes("api_error") || text.includes("error")) {
+        // Attempt to extract JSON substring if embedded in logs/stream
+        const firstBrace = text.indexOf("{");
+        const lastBrace = text.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonStr = text.substring(firstBrace, lastBrace + 1);
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.error?.code === "api_error" || parsed.error?.message) {
+            throw new Error(parsed.error.message);
+          }
+        }
+      }
+
+      // Fallback text check
+      if (
+        text.includes("gemini-3.5-flash is currently experiencing high demand")
+      ) {
+        throw Error(
+          "gemini-3.5-flash is currently experiencing high demand, spikes in demand are usually temporary. Please try again later.",
+        );
+      }
+    } catch (e: any) {
+      if (
+        e.message &&
+        e.message !== "Unexpected token..." &&
+        !e.message.includes("JSON")
+      ) {
+        throw e;
+      }
+    }
+  };
 
   async function init() {
     const savedPrompt = localStorage.getItem("projectPrompt");
@@ -62,7 +93,6 @@ export function Builder() {
     } else {
       setLoading(true);
       try {
-        // 1. Fetch Template
         const response = await axios.post(`${BACKEND_URL}/template`, {
           prompt: savedPrompt,
         });
@@ -70,7 +100,7 @@ export function Builder() {
         localStorage.setItem("cachedTemplate", JSON.stringify(response.data));
         setSteps(
           parseXml(uiPrompt).map((x: Step) => ({ ...x, status: "pending" })),
-        ); // 2. Fetch Chat via Stream
+        );
 
         const chatResponse = await fetch(`${BACKEND_URL}/chat`, {
           method: "POST",
@@ -79,6 +109,10 @@ export function Builder() {
             prompt: { userTask: savedPrompt, boilerplate: uiPrompt },
           }),
         });
+
+        if (!chatResponse.ok) {
+          throw new Error("Failed to communicate with chat server.");
+        }
 
         if (!chatResponse.body) throw new Error("No response body");
 
@@ -89,8 +123,12 @@ export function Builder() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          fullResponse += decoder.decode(value, { stream: true });
-        } // 3. Process the full XML response
+          const chunk = decoder.decode(value, { stream: true });
+          fullResponse += chunk;
+          checkForApiError(fullResponse);
+        }
+
+        checkForApiError(fullResponse);
 
         const newSteps = parseXml(fullResponse);
         setSteps((s) => [
@@ -98,15 +136,25 @@ export function Builder() {
           ...newSteps.map((x) => ({ ...x, status: "pending" as const })),
         ]);
 
+        const newFiles: FileItem[] = newSteps
+          .filter((step) => step.type === StepType.CreateFile)
+          .map((step) => ({
+            name: step.path?.split("/").pop() || "file",
+            path: step.path || "",
+            type: "file" as const,
+            content: step.code || "",
+          }));
+
+        setFiles(newFiles);
+        if (newFiles.length > 0) setSelectedFile(newFiles[0]);
+
         setLlmMessages([
           { role: "user", content: savedPrompt },
           { role: "assistant", content: fullResponse },
         ]);
       } catch (err: any) {
         console.error("Initialization error:", err);
-        if (err.response?.status === 429) {
-          alert("Rate limit exceeded. Please wait 1 minute before refreshing.");
-        }
+        toast.error(err.message || "An error occurred during initialization.");
       } finally {
         setLoading(false);
       }
@@ -114,55 +162,13 @@ export function Builder() {
   }
 
   useEffect(() => {
-    console.log(
-      "DEBUG: useEffect triggered. isInitialized:",
-      isInitialized.current,
-    );
     if (!isInitialized.current) {
       init();
       isInitialized.current = true;
     }
-  }, []); // 2. File System Syncing (WebContainer Mount)
-  useEffect(() => {
-    if (!WebContainer || files.length === 0) return;
-
-    const createMountStructure = (files: FileItem[]): any => {
-      const mountStructure: any = {};
-
-      files.forEach((file) => {
-        if (file.type === "folder") {
-          mountStructure[file.name] = {
-            directory: file.children ? createMountStructure(file.children) : {},
-          };
-        } else {
-          mountStructure[file.name] = {
-            file: {
-              contents: file.content || "",
-            },
-          };
-        }
-      });
-
-      return mountStructure;
-    };
-    const webcontainer = useWebContainer(); // Now 'webcontainer' refers to the actual instance returned by the hook
-    if (!webcontainer || files.length === 0) return;
-
-    webcontainer.mount(createMountStructure(files));
-  }, [files, webcontainer]); // Simple helper for logging
-
-  const trackRequest = () => {
-    const count = parseInt(localStorage.getItem("req_count") || "0") + 1;
-    localStorage.setItem("req_count", count.toString());
-    console.log(`Total frontend requests: ${count}`); // Warn the user when they are getting close to the limit
-
-    if (count >= 18) {
-      console.warn("You are approaching your free tier limit!");
-    }
-  }; // 3. User Interaction (Send Button)
+  }, []);
 
   const handleSendMessage = async () => {
-    trackRequest();
     if (!userPrompt.trim()) return;
 
     setLoading(true);
@@ -184,87 +190,54 @@ export function Builder() {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json(); // TRIGGER THE TOAST HERE
-        if (errorData.code === "too_many_requests") {
-          toast.warning("Rate limit reached", {
-            description:
-              "You've hit the free tier limit. Please wait about a minute before trying again.",
-          });
-        }
-        return;
-      }
       if (!response.body) throw new Error("No response body");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullResponse = "";
+      let accumulatedText = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        fullResponse += chunk; // IF STREAMING ERROR:
-        // When you detect the error chunk in your while loop:
+        fullResponse += chunk;
+        accumulatedText += chunk;
 
-        if (fullResponse.includes("high demand")) {
-          toast.error("Capacity Limit Reached", {
-            description:
-              "Gemini is experiencing high demand. Please try again in a moment.",
-          });
-          return;
-        } // Check if backend sent an error signal
-        if (chunk.includes("error")) {
-          console.error("Stream reported error:", chunk);
-          throw new Error("AI Service is currently busy. Please try again.");
+        // Check for api error on every chunk stream arrival
+        checkForApiError(fullResponse);
+
+        const { files: parsedFiles } = parseBoltArtifacts(accumulatedText);
+
+        if (parsedFiles.length > 0) {
+          const mappedFiles: FileItem[] = parsedFiles.map((pf) => ({
+            name: pf.path.split("/").pop() || "file",
+            path: pf.path,
+            type: "file",
+            content: pf.content,
+          }));
+          setFiles(mappedFiles);
         }
-      } // Process final response
+      }
+
+      checkForApiError(fullResponse);
 
       const newSteps = parseXml(fullResponse);
       setSteps((s) => [
         ...s,
         ...newSteps.map((x) => ({ ...x, status: "pending" as const })),
       ]);
-      setLlmMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: fullResponse },
-      ]); // Update Files
-
-      const newFiles = newSteps
-        .filter((step) => step.type === StepType.CreateFile)
-        .map((step) => ({
-          name: step.path?.split("/").pop() || "file",
-          path: step.path || "",
-          type: "file" as const,
-          content: step.code || "",
-        }));
-
-      setFiles((prev) => {
-        const map = new Map(prev.map((f) => [f.path, f]));
-        newFiles.forEach((f) => map.set(f.path, f));
-        return Array.from(map.values());
-      });
     } catch (err: any) {
       console.error("Chat error:", err);
-      alert(err.message || "An error occurred while processing your request.");
+      toast.error(err.message || "An error occurred while generating changes.");
     } finally {
       setLoading(false);
     }
   };
 
-  const heroStyle = {
-    background:
-      "linear-gradient(to bottom, #0a2342 0%, #102a43 35%, #020617 100%)",
-    backgroundColor: "#020617",
-    position: "relative" as const,
-    minHeight: "100vh",
-    width: "100vw",
-    overflow: "hidden",
-  };
-
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col" style={heroStyle}>
+    <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="flex-1 overflow-hidden grid grid-cols-4 gap-6 p-6">
         <div className="col-span-1 space-y-6 overflow-auto">
           <StepsList
@@ -277,28 +250,33 @@ export function Builder() {
               <textarea
                 value={userPrompt}
                 onChange={(e) => setUserPrompt(e.target.value)}
-                className="w-full p-2"
+                className="w-full p-2 bg-gray-800 text-white rounded border border-gray-700"
+                placeholder="Ask changes..."
               />
-
               <button
+                type="button"
                 onClick={handleSendMessage}
-                className="bg-purple-600 px-4 text-white"
+                className="bg-purple-600 px-4 text-white rounded hover:bg-purple-500"
               >
                 Send
               </button>
             </div>
           )}
         </div>
-        <div className="col-span-1">
+        <div className="col-span-1 bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
           <FileExplorer files={files} onFileSelect={setSelectedFile} />
         </div>
-        <div className="col-span-2 bg-gray-900 p-4 h-[calc(100vh-8rem)]">
+        <div className="col-span-2 bg-gray-900 p-4 h-[calc(100vh-8rem)] rounded-lg border border-gray-800 flex flex-col">
           <TabView activeTab={activeTab} onTabChange={setActiveTab} />
-          {activeTab === "code" ? (
-            <CodeEditor file={selectedFile} />
-          ) : (
-            <PreviewFrame webContainer={webcontainer!} files={files} />
-          )}
+          <div className="flex-1 overflow-hidden mt-2">
+            {activeTab === "code" ? (
+              <CodeEditor file={selectedFile} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                Preview disabled (WebContainer removed)
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
