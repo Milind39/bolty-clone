@@ -8,7 +8,6 @@ require("dotenv").config();
 import morgan from 'morgan';
 import cors from 'cors';
 
-// console.log(process.env.GEMENI_API_KEY);
 const ApiKey = process.env.GEMENI_API_KEY || "" ;
 const client = new genai.GoogleGenAI({apiKey: ApiKey});
 

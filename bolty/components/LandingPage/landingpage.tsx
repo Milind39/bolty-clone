@@ -6,6 +6,7 @@ import axios from "axios";
 import { toast } from "sonner"; // 1. Import toast
 import { BACKEND_URL } from "@/config";
 import { Builder } from "../Builder/builderpage";
+import Footer from "../Footer/footer";
 
 export default function LandingPage() {
   const [prompt, setPrompt] = useState("");
@@ -92,8 +93,8 @@ export default function LandingPage() {
           </filter>
         </defs>
       </svg>
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        <section className="w-full max-w-fit text-center justify-center container mb-28 mt-[20px] mx-auto rounded-2xl shadow-xl text-white">
+      <div className="relative z-10 container mx-auto px-4 py-20">
+        <section className="w-full max-w-fit text-center justify-center container mb-28 mt-20 mx-auto rounded-2xl shadow-xl text-white">
           <h1 className="text-5xl md:text-6xl font-extrabold text-white mb-6 tracking-tight drop-shadow-lg">
             What should we build today?
           </h1>
@@ -153,6 +154,7 @@ export default function LandingPage() {
           </div>
         </section>
       </div>
+      <Footer />
     </main>
   );
 }
