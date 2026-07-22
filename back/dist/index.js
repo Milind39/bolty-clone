@@ -91,7 +91,6 @@ app.post("/template", async (req, res) => {
 app.post("/chat", async (req, res) => {
     requestCount++;
     console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
-    // FIX: Destructure from req.body, not req.body.prompt
     const { userTask, boilerplate } = req.body.prompt;
     const finalPrompt = `
 [INSTRUCTIONS]
@@ -105,66 +104,173 @@ within <project_files> tags. Your task is defined within <user_request> tags.
   complexity from previous turns unless explicitly asked to modify existing features.
 
 <project_files>
-${boilerplate}
+${boilerplate || ""}
 </project_files>
 
 <user_request>
 ${userTask}
 </user_request>
 `;
-    // 2. Set headers to allow streaming
+    // Set headers to allow streaming chunks
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
     try {
         const response = await (0, loghelper_1.callGeminiAndLog)({
-            model: "gemini-3.5-flash",
+            model: "gemini-3.5-flash", // Updated to standard Gemini flash model syntax
             input: [
                 { type: "text", text: finalPrompt },
             ],
-            system_instruction: (0, prompts_1.getSystemPrompt)(),
+            system_instruction: typeof prompts_1.getSystemPrompt === "function" ? (0, prompts_1.getSystemPrompt)() : "You are a helpful coding assistant.",
             stream: true,
         });
         console.log("Stream object type:", typeof response);
-        // If this logs 'object' but you can't iterate over it, it might not be a standard AsyncIterable.
-        // 3. Pipe the stream directly to the response
+        // Pipe the stream events directly to the HTTP response
         for await (const event of response) {
-            console.log("Processing event type:", event.event_type); // Debugging line
-            console.log("event recieved:", event);
-            // 1. ADD THIS: Check for API-level errors
+            console.log("Processing event type:", event.event_type);
+            // Check for API-level errors inside the event stream
             if (event.event_type === "error") {
                 console.error("Gemini API stream error:", event.error);
-                // Send the specific error message to the client
-                // Write a JSON error message to the stream
                 res.write(JSON.stringify({
                     error: true,
-                    message: event.error.message || "Unknown API Error"
+                    message: event.error?.message || "Unknown API Error"
                 }));
-                break; // Stop the loop
+                break;
             }
-            if (event.event_type === "step.delta" && event.delta.type === "text") {
+            // Extract text chunks from the delta structure
+            if (event.event_type === "step.delta" && event.delta?.type === "text") {
                 res.write(event.delta.text);
             }
+            // Fallback check if your wrapper uses standard text content deltas
+            else if (event.text) {
+                res.write(event.text);
+            }
         }
-        console.log("Stream object received.");
-        console.log(response);
+        console.log("Stream successfully completed and sent.");
     }
     catch (error) {
         console.error("Fatal Stream Exception:", error);
-        // Only attempt to set the status if headers haven't been sent yet
+        // If headers haven't gone out yet, send standard JSON error code
         if (!res.headersSent) {
-            res.status(500).json({ error: "Internal Server Error" });
+            res.status(500).json({ error: "Internal Server Error", message: error.message });
         }
         else {
-            // Headers are already sent (we are in the middle of a stream),
-            // so we cannot change the status code to 500.
-            // We send a signal via the stream instead.
+            // Headers already sent (mid-stream), communicate failure over the stream payload
             res.write(JSON.stringify({ error: true, message: "Stream interrupted due to server error" }));
         }
     }
     finally {
-        res.end(); // Always ensure the response is closed
+        res.end(); // Always close the HTTP connection
     }
 });
+/****************************MOCK RESPONSE******************* */
+// app.post("/chat", async (req, res) => {
+//     requestCount++;
+//     console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
+//     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+//     res.setHeader('Transfer-Encoding', 'chunked');
+//     // Your dummy response formatted with the Bolt artifact/action tags or step XML
+//     const dummyXmlResponse = `
+// <boltArtifact id="project-import" title="Mock Project">
+//   <boltAction type="file" filePath="App.tsx">
+//     import React from 'react';
+//     export default function App() {
+//       return <div className="p-4 text-white bg-slate-900">Hello from Mock Stream!</div>;
+//     }
+//   </boltAction>
+//   <boltAction type="file" filePath="package.json">
+//     {
+//       "name": "mock-app",
+//       "version": "1.0.0"
+//     }
+//   </boltAction>
+// </boltArtifact>
+//     `.trim();
+//     try {
+//         // Simulate streaming chunk-by-chunk with a slight delay
+//         const chunkSize = 15; // characters per chunk
+//         for (let i = 0; i < dummyXmlResponse.length; i += chunkSize) {
+//             const chunk = dummyXmlResponse.slice(i, i + chunkSize);
+//             res.write(chunk);
+//             // Wait 50ms to realistically simulate network token streaming
+//             await new Promise((resolve) => setTimeout(resolve, 50));
+//         }
+//     } catch (error) {
+//         console.error("Mock stream error:", error);
+//     } finally {
+//         res.end();
+//     }
+// });
+/************ACTUAL ORIGINAL RESPONSE*************************/
+// FIX: Destructure from req.body, not req.body.prompt
+//     const { userTask, boilerplate } = req.body.prompt;
+//     const finalPrompt = `
+// [INSTRUCTIONS]
+// You are an expert developer. You are provided with existing project files 
+// within <project_files> tags. Your task is defined within <user_request> tags.
+// - IF the task is simple (like "Create a todo app"), PROVIDE A SIMPLE IMPLEMENTATION.
+// - DO NOT invent complex features, analytics dashboards, or platforms.
+// - Focus ONLY on the requested functionality.
+// - Prioritize <user_request> over any assumptions about the project's purpose.
+// - Treat each <user_request> as a fresh task. Do not carry over architectural 
+//   complexity from previous turns unless explicitly asked to modify existing features.
+// <project_files>
+// ${boilerplate}
+// </project_files>
+// <user_request>
+// ${userTask}
+// </user_request>
+// `;
+//     // 2. Set headers to allow streaming
+//     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+//     res.setHeader('Transfer-Encoding', 'chunked');
+//     try {
+//         const response = await callGeminiAndLog({
+//             model: "gemini-3.5-flash",
+//             input: [
+//                 { type: "text", text: finalPrompt },
+//             ],
+//             system_instruction: getSystemPrompt(),
+//             stream: true,
+//         });
+//         console.log("Stream object type:", typeof response);
+//         // If this logs 'object' but you can't iterate over it, it might not be a standard AsyncIterable.
+//         // 3. Pipe the stream directly to the response
+//         for await (const event of (response as any)) {
+//             console.log("Processing event type:", event.event_type); // Debugging line
+//             console.log("event recieved:", event);
+//             // 1. ADD THIS: Check for API-level errors
+//             if (event.event_type === "error") {
+//                 console.error("Gemini API stream error:", event.error);
+//                 // Send the specific error message to the client
+//                 // Write a JSON error message to the stream
+//                 res.write(JSON.stringify({
+//                     error: true,
+//                     message: event.error.message || "Unknown API Error"
+//                 }));
+//                 break; // Stop the loop
+//             }
+//             if (event.event_type === "step.delta" && event.delta.type === "text") {
+//                 res.write(event.delta.text);
+//             }
+//         }
+//         console.log("Stream object received.");
+//         console.log(response);
+//     }
+//     catch (error) {
+//         console.error("Fatal Stream Exception:", error);
+//         // Only attempt to set the status if headers haven't been sent yet
+//         if (!res.headersSent) {
+//             res.status(500).json({ error: "Internal Server Error" });
+//         } else {
+//             // Headers are already sent (we are in the middle of a stream),
+//             // so we cannot change the status code to 500.
+//             // We send a signal via the stream instead.
+//             res.write(JSON.stringify({ error: true, message: "Stream interrupted due to server error" }));
+//         }
+//     } finally {
+//         res.end(); // Always ensure the response is closed
+//     }
+// });
 app.listen(PORT, () => {
     console.log(`Backend is running at http://localhost:${PORT}`);
 });
