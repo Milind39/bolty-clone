@@ -12,6 +12,7 @@ import { CodeEditor } from "@/components/CodeEditor";
 import { parseXml } from "@/utils/steps";
 import { toast } from "sonner";
 import { parseBoltArtifacts } from "@/utils/parseBoltStream";
+import { Terminal } from "@/components/Terminal";
 
 export function Builder() {
   const router = useRouter();
@@ -223,6 +224,21 @@ export function Builder() {
 
       checkForApiError(fullResponse);
 
+      // Trigger simulated npm terminal logs
+      if (typeof window.writeToTerminal === "function") {
+        setTimeout(() => {
+          window.writeToTerminal?.("\x1b[36m$ npm install\x1b[0m");
+          window.writeToTerminal?.("packages installed successfully.");
+        }, 500);
+
+        setTimeout(() => {
+          window.writeToTerminal?.("\x1b[36m$ npm run dev\x1b[0m");
+          window.writeToTerminal?.(
+            "> local dev server running on port 3000 🚀",
+          );
+        }, 1200);
+      }
+
       const newSteps = parseXml(fullResponse);
       setSteps((s) => [
         ...s,
@@ -268,12 +284,27 @@ export function Builder() {
         </div>
         <div className="col-span-2 bg-gray-900 p-4 h-[calc(100vh-8rem)] rounded-lg border border-gray-800 flex flex-col">
           <TabView activeTab={activeTab} onTabChange={setActiveTab} />
-          <div className="flex-1 overflow-hidden mt-2">
+          <div className="flex-1 overflow-hidden mt-2 flex flex-col gap-2">
             {activeTab === "code" ? (
-              <CodeEditor file={selectedFile} />
-            ) : (
+              <>
+                {/* Top: Code Editor takes up 65% of the height */}
+                <div className="h-[65%] w-full overflow-hidden rounded border border-gray-800">
+                  <CodeEditor file={selectedFile} />
+                </div>
+
+                {/* Bottom: Terminal takes up 35% of the height */}
+                <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
+                  <Terminal />
+                </div>
+              </>
+            ) : activeTab === "preview" ? (
               <div className="flex items-center justify-center h-full text-gray-400">
                 Preview disabled (WebContainer removed)
+              </div>
+            ) : (
+              // If you keep 'terminal' as an independent tab option
+              <div className="h-full w-full">
+                <Terminal />
               </div>
             )}
           </div>

@@ -274,39 +274,4 @@ ${userTask}
 app.listen(PORT, () => {
     console.log(`Backend is running at http://localhost:${PORT}`);
 });
-// async function main() {
-/**************NON STREAMED OUTPUT**************/
-// console.log("Stream initialized, waiting for response...");
-// const response = await client.interactions.create({
-//     model: "gemini-3.5-flash",
-//     input: "Write a code for a todo application",
-// });
-// console.log(response.output_text);
-/**************STREAMED OUTPUT**************/
-//     try {
-//         console.log("Stream initialized, waiting for response...");
-//         const stream = await client.interactions.create({
-//             model: "gemini-3.5-flash",
-//             input: [
-//                 { type: "text", text: "" },
-//                 { type: "text", text: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n` },
-//                 { type: "text", text: "<running_commands>\n</running_commands>\n\n<bolt_file_modifications>\n<file path=\". gitignore\" type=\"removed\"></file>\n<file path=\"eslint.config.js\" type=\"removed\"></file>\n<file path=\"index.html\" type=\"removed\"></file>\n<file path=\"package-lock.json\" type=\"removed\"></file>\n<file path=\"package.json\" type=\"removed\"></file>\n<file path=\"postcss.config.js\" type=\"removed\"></file>\n<file path=\"tailwind.config.js\" type=\"removed\"></file>\n<file path=\"tsconfig.app.json\" type=\"removed\"></file>\n<file path=\"tsconfig.json\" type=\"removed\"></file>\n<file path=\"tsconfig.node.json\" type=\"removed\"></file>\n<file path=\"vite.config.ts\" type=\"removed\"></file>\n<file path=\". bolt/prompt\" type=\"removed\"></file>\n<file path=\"src/App.tsx\" type=\"removed\"></file>\n<file path=\"src/index.css\" type=\"removed\"></file>\n<file path=\"src/main.tsx\" type=\"removed\"></file>\n<file path=\"src/vite-env.d.ts\" type=\"removed\"></file>\n</bolt_file_modifications>\n\nCreate a todo app" },
-//             ],
-//             system_instruction: getSystemPrompt(),
-//             stream: true,
-//         });
-// for await (const event of stream) {
-//     if (event.event_type === "step.delta") {
-//         if (event.delta.type === "text") {
-//             process.stdout.write(event.delta.text);
-//         }
-//     }
-// }
-// console.log("Stream object received.");
-//     }
-//     catch (error) {
-//     console.error("Error during interaction:", error);
-// }
-// }
-// main();
 //# sourceMappingURL=index.js.map
