@@ -12,7 +12,6 @@ const loghelper_1 = require("./utility/loghelper");
 require("dotenv").config();
 const morgan_1 = __importDefault(require("morgan"));
 const cors_1 = __importDefault(require("cors"));
-// console.log(process.env.GEMENI_API_KEY);
 const ApiKey = process.env.GEMENI_API_KEY || "";
 const client = new genai.GoogleGenAI({ apiKey: ApiKey });
 const app = (0, express_1.default)();
