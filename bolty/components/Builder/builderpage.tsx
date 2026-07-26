@@ -109,9 +109,20 @@ export function Builder() {
         });
         uiPrompt = response.data.uiPrompt;
         localStorage.setItem("cachedTemplate", JSON.stringify(response.data));
-        setSteps(
-          parseXml(uiPrompt).map((x: Step) => ({ ...x, status: "pending" })),
-        );
+        const templateSteps = parseXml(uiPrompt);
+        setSteps(templateSteps.map((x: Step) => ({ ...x, status: "pending" })));
+
+        // --- ADD THIS BLOCK TO RENDER TEMPLATE FILES IMMEDIATELY ---
+        const flatTemplateFiles = templateSteps
+          .filter((step) => step.type === StepType.CreateFile)
+          .map((step) => ({
+            path: step.path || "",
+            content: step.code || "",
+          }));
+
+        if (flatTemplateFiles.length > 0) {
+          setFiles(buildFileTree(flatTemplateFiles));
+        }
 
         const chatResponse = await fetch(`${BACKEND_URL}/chat`, {
           method: "POST",
@@ -130,13 +141,37 @@ export function Builder() {
         const reader = chatResponse.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = "";
+        let accumulatedText = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullResponse += chunk;
+          accumulatedText += chunk;
           checkForApiError(fullResponse);
+          // 2. Safely merge streamed chat files with existing root template files instead of overwriting them
+          const { files: parsedFiles } = parseBoltArtifacts(accumulatedText);
+          if (parsedFiles.length > 0) {
+            setFiles((prevFiles) => {
+              const existingFlat = flattenFiles(prevFiles);
+              const fileMap = new Map(
+                existingFlat.map((f) => [f.path, f.content]),
+              );
+
+              parsedFiles.forEach((pf) => {
+                fileMap.set(pf.path, pf.content);
+              });
+
+              const mergedFlat = Array.from(fileMap.entries()).map(
+                ([path, content]) => ({
+                  path,
+                  content,
+                }),
+              );
+              return buildFileTree(mergedFlat);
+            });
+          }
         }
 
         checkForApiError(fullResponse);

@@ -94,11 +94,11 @@ export function FileExplorer({
         </h2>
         <button
           onClick={handleDownload}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
           title="Download Project as ZIP"
         >
           <Download size={14} />
-          <span>ZIP</span>
+          <span>Download</span>
         </button>
       </div>
 
