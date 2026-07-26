@@ -1,9 +1,17 @@
 import React, { useState } from "react";
-import { FolderTree, File, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  FolderTree,
+  File,
+  ChevronRight,
+  ChevronDown,
+  Download,
+} from "lucide-react";
 import { FileItem } from "../types";
+import { downloadProjectZip } from "@/utils/downloadProject";
 
 interface FileExplorerProps {
-  files: FileItem[];
+  files: FileItem[]; // Tree structure for the UI tree view
+  flatFiles: Array<{ path: string; content: string }>; // Flat array for zip bundling
   onFileSelect: (file: FileItem) => void;
 }
 
@@ -63,14 +71,37 @@ function FileNode({ item, depth, onFileClick }: FileNodeProps) {
   );
 }
 
-export function FileExplorer({ files, onFileSelect }: FileExplorerProps) {
+export function FileExplorer({
+  files,
+  flatFiles,
+  onFileSelect,
+}: FileExplorerProps) {
+  const handleDownload = async () => {
+    if (!flatFiles || flatFiles.length === 0) {
+      alert("No files available to download yet!");
+      return;
+    }
+    await downloadProjectZip(flatFiles, "my-bolty-app");
+  };
+
   return (
-    <div className="bg-gray-900 rounded-lg shadow-lg p-4 h-full overflow-auto">
-      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-100">
-        <FolderTree className="w-5 h-5" />
-        File Explorer
-      </h2>
-      <div className="space-y-1">
+    <div className="bg-gray-900 rounded-lg shadow-lg p-4 h-full overflow-auto flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-100">
+          <FolderTree className="w-5 h-5" />
+          File Explorer
+        </h2>
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all active:scale-95"
+          title="Download Project as ZIP"
+        >
+          <Download size={14} />
+          <span>ZIP</span>
+        </button>
+      </div>
+
+      <div className="space-y-1 flex-1 overflow-y-auto">
         {files.map((file, index) => (
           <FileNode
             key={`${file.path}-${index}`}

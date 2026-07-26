@@ -13,6 +13,7 @@ import { parseXml } from "@/utils/steps";
 import { toast } from "sonner";
 import { parseBoltArtifacts } from "@/utils/parseBoltStream";
 import { Terminal } from "@/components/Terminal";
+import { buildFileTree } from "@/utils/buildFileTree";
 
 export function Builder() {
   const router = useRouter();
@@ -35,9 +36,7 @@ export function Builder() {
   // Helper function to safely detect and throw API errors from stream text
   const checkForApiError = (text: string) => {
     try {
-      // Check if text contains JSON or partial JSON with api_error
       if (text.includes("api_error") || text.includes("error")) {
-        // Attempt to extract JSON substring if embedded in logs/stream
         const firstBrace = text.indexOf("{");
         const lastBrace = text.lastIndexOf("}");
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -49,7 +48,6 @@ export function Builder() {
         }
       }
 
-      // Fallback text check
       if (
         text.includes("gemini-3.5-flash is currently experiencing high demand")
       ) {
@@ -88,9 +86,21 @@ export function Builder() {
     if (cachedTemplate) {
       const data = JSON.parse(cachedTemplate);
       uiPrompt = data.uiPrompt;
-      setSteps(
-        parseXml(uiPrompt).map((x: Step) => ({ ...x, status: "completed" })),
-      );
+      const parsedSteps = parseXml(uiPrompt);
+      setSteps(parsedSteps.map((x: Step) => ({ ...x, status: "completed" })));
+
+      // Populate file tree from cached template steps
+      const flatCachedFiles = parsedSteps
+        .filter((step) => step.type === StepType.CreateFile)
+        .map((step) => ({
+          path: step.path || "",
+          content: step.code || "",
+        }));
+
+      if (flatCachedFiles.length > 0) {
+        const treeFiles = buildFileTree(flatCachedFiles);
+        setFiles(treeFiles);
+      }
     } else {
       setLoading(true);
       try {
@@ -137,18 +147,17 @@ export function Builder() {
           ...newSteps.map((x) => ({ ...x, status: "pending" as const })),
         ]);
 
-        const newFiles: FileItem[] = newSteps
+        const flatFiles = newSteps
           .filter((step) => step.type === StepType.CreateFile)
           .map((step) => ({
-            name: step.path?.split("/").pop() || "file",
             path: step.path || "",
-            type: "file" as const,
             content: step.code || "",
           }));
 
-        setFiles(newFiles);
-        if (newFiles.length > 0) setSelectedFile(newFiles[0]);
+        const treeFiles = buildFileTree(flatFiles);
+        setFiles(treeFiles);
 
+        // Optional: Pick first file for default selection if needed
         setLlmMessages([
           { role: "user", content: savedPrompt },
           { role: "assistant", content: fullResponse },
@@ -206,25 +215,22 @@ export function Builder() {
         fullResponse += chunk;
         accumulatedText += chunk;
 
-        // Check for api error on every chunk stream arrival
         checkForApiError(fullResponse);
 
         const { files: parsedFiles } = parseBoltArtifacts(accumulatedText);
 
         if (parsedFiles.length > 0) {
-          const mappedFiles: FileItem[] = parsedFiles.map((pf) => ({
-            name: pf.path.split("/").pop() || "file",
+          const flatMapped = parsedFiles.map((pf) => ({
             path: pf.path,
-            type: "file",
             content: pf.content,
           }));
-          setFiles(mappedFiles);
+          const treeFiles = buildFileTree(flatMapped);
+          setFiles(treeFiles);
         }
       }
 
       checkForApiError(fullResponse);
 
-      // Trigger simulated npm terminal logs
       if (typeof window.writeToTerminal === "function") {
         setTimeout(() => {
           window.writeToTerminal?.("\x1b[36m$ npm install\x1b[0m");
@@ -250,6 +256,22 @@ export function Builder() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to flatten the hierarchical tree back for ZIP downloads & flattening needs
+  const flattenFiles = (
+    nodeList: FileItem[],
+  ): Array<{ path: string; content: string }> => {
+    let acc: Array<{ path: string; content: string }> = [];
+    nodeList.forEach((node) => {
+      if (node.type === "file") {
+        acc.push({ path: node.path, content: node.content || "" });
+      }
+      if (node.children && node.children.length > 0) {
+        acc = acc.concat(flattenFiles(node.children));
+      }
+    });
+    return acc;
   };
 
   return (
@@ -280,19 +302,20 @@ export function Builder() {
           )}
         </div>
         <div className="col-span-1 bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
-          <FileExplorer files={files} onFileSelect={setSelectedFile} />
+          <FileExplorer
+            files={files}
+            flatFiles={flattenFiles(files)}
+            onFileSelect={setSelectedFile}
+          />
         </div>
         <div className="col-span-2 bg-gray-900 p-4 h-[calc(100vh-8rem)] rounded-lg border border-gray-800 flex flex-col">
           <TabView activeTab={activeTab} onTabChange={setActiveTab} />
           <div className="flex-1 overflow-hidden mt-2 flex flex-col gap-2">
             {activeTab === "code" ? (
               <>
-                {/* Top: Code Editor takes up 65% of the height */}
                 <div className="h-[65%] w-full overflow-hidden rounded border border-gray-800">
                   <CodeEditor file={selectedFile} />
                 </div>
-
-                {/* Bottom: Terminal takes up 35% of the height */}
                 <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
                   <Terminal />
                 </div>
@@ -302,7 +325,6 @@ export function Builder() {
                 Preview disabled (WebContainer removed)
               </div>
             ) : (
-              // If you keep 'terminal' as an independent tab option
               <div className="h-full w-full">
                 <Terminal />
               </div>

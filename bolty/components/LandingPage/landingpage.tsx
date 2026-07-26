@@ -89,9 +89,9 @@ export default function LandingPage() {
       </svg>
 
       {/* Hero Content Section */}
-      <div className="relative z-10 min-h-screen container mx-auto px-4 pt-auto pb-20 flex flex-col items-center justify-center">
-        <section className="w-full max-w-4xl text-center mb-16 mx-auto my-2 rounded-2xl p-6 container shadow-xl">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 tracking-tight drop-shadow-lg">
+      <div className="relative z-10 min-h-screen container mx-auto px-auto pt-auto pb-auto flex flex-col items-center justify-center">
+        <section className="w-full max-w-4xl text-center mb-auto mx-auto my-auto rounded-2xl p-6 container shadow-xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-14 tracking-tight drop-shadow-lg">
             What should we build today?
           </h1>
           <p className="text-lg sm:text-xl text-gray-200 mb-8 font-medium">
