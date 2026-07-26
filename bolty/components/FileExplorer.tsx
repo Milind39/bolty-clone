@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import {
   FolderTree,
-  File,
   ChevronRight,
   ChevronDown,
   Download,
+  FolderIcon,
+  FileTextIcon,
 } from "lucide-react";
 import { FileItem } from "../types";
 import { downloadProjectZip } from "@/utils/downloadProject";
@@ -49,9 +50,9 @@ function FileNode({ item, depth, onFileClick }: FileNodeProps) {
           </span>
         )}
         {item.type === "folder" ? (
-          <FolderTree className="w-4 h-4 text-blue-400" />
+          <FolderIcon className="w-4 h-4 text-blue-400" />
         ) : (
-          <File className="w-4 h-4 text-gray-400" />
+          <FileTextIcon className="w-4 h-4 text-gray-400" />
         )}
         <span className="text-gray-200">{item.name}</span>
       </div>

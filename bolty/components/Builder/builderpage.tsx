@@ -157,7 +157,6 @@ export function Builder() {
         const treeFiles = buildFileTree(flatFiles);
         setFiles(treeFiles);
 
-        // Optional: Pick first file for default selection if needed
         setLlmMessages([
           { role: "user", content: savedPrompt },
           { role: "assistant", content: fullResponse },
@@ -220,12 +219,28 @@ export function Builder() {
         const { files: parsedFiles } = parseBoltArtifacts(accumulatedText);
 
         if (parsedFiles.length > 0) {
-          const flatMapped = parsedFiles.map((pf) => ({
-            path: pf.path,
-            content: pf.content,
-          }));
-          const treeFiles = buildFileTree(flatMapped);
-          setFiles(treeFiles);
+          setFiles((prevFiles) => {
+            // 1. Flatten current state to keep existing template/root files
+            const existingFlat = flattenFiles(prevFiles);
+            const fileMap = new Map(
+              existingFlat.map((f) => [f.path, f.content]),
+            );
+
+            // 2. Insert or update newly streamed files
+            parsedFiles.forEach((pf) => {
+              fileMap.set(pf.path, pf.content);
+            });
+
+            // 3. Rebuild complete file tree map back
+            const mergedFlat = Array.from(fileMap.entries()).map(
+              ([path, content]) => ({
+                path,
+                content,
+              }),
+            );
+
+            return buildFileTree(mergedFlat);
+          });
         }
       }
 
