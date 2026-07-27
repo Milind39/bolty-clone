@@ -237,7 +237,8 @@ Here are some examples of correct usage of artifacts:
             "scripts": {
               "dev": "vite",
               "build": "vite build",
-              "preview": "vite preview"
+              "preview": "vite preview",
+              "start": "npm install && npm run dev"
             },
             "dependencies": {
               "react": "^18.2.0",

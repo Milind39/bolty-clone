@@ -326,7 +326,7 @@ export function Builder() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-      <div className="flex-1 overflow-hidden grid grid-cols-4 gap-6 p-6">
+      <div className="flex-1 overflow-hidden grid grid-cols-4 gap-4 p-4">
         {/* <div className="col-span-1 space-y-6 overflow-auto">
           <StepsList
             steps={steps}
@@ -351,24 +351,24 @@ export function Builder() {
             </div>
           )}
         </div> */}
-        <div className="col-span-1 bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
+        <div className="col-span-1 bg-gray-900 rounded-lg overflow-hidden border h-[calc(100vh-6rem)] border-gray-800">
           <FileExplorer
             files={files}
             flatFiles={flattenFiles(files)}
             onFileSelect={setSelectedFile}
           />
         </div>
-        <div className="col-span-2 bg-gray-900 p-4 h-[calc(100vh-8rem)] rounded-lg border border-gray-800 flex flex-col">
+        <div className="col-span-3 bg-gray-900 p-4 h-[calc(100vh-6rem)] rounded-lg border border-gray-800 flex flex-col">
           <TabView activeTab={activeTab} onTabChange={setActiveTab} />
           <div className="flex-1 overflow-hidden mt-2 flex flex-col gap-2">
             {activeTab === "code" ? (
               <>
-                <div className="h-[65%] w-full overflow-hidden rounded border border-gray-800">
+                <div className="h-[100%] w-full overflow-hidden rounded border border-gray-800">
                   <CodeEditor file={selectedFile} />
                 </div>
-                <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
+                {/* <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
                   <Terminal />
-                </div>
+                </div> */}
               </>
             ) : activeTab === "preview" ? (
               <div className="flex items-center justify-center h-full text-gray-400">
