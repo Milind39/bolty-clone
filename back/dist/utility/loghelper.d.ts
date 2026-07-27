@@ -2,7 +2,7 @@
  * Helper to log and execute Gemini API calls
  */
 export declare function callGeminiAndLog(params?: any): Promise<Omit<{
-    model?: ("gemini-2.5-computer-use-preview-10-2025" | "gemini-2.5-flash" | "gemini-2.5-flash-image" | "gemini-2.5-flash-lite" | "gemini-2.5-flash-lite-preview-09-2025" | "gemini-2.5-flash-native-audio-preview-12-2025" | "gemini-2.5-flash-preview-09-2025" | "gemini-2.5-flash-preview-tts" | "gemini-2.5-pro" | "gemini-2.5-pro-preview-tts" | "gemini-3-flash-preview" | "gemini-3-pro-image-preview" | "gemini-3-pro-preview" | "gemini-3.1-pro-preview" | "gemini-3.1-flash-image-preview" | "gemini-3.1-flash-lite" | "gemini-3.1-flash-lite-preview" | "gemini-3.1-flash-tts-preview" | "gemini-3.5-flash" | "lyria-3-clip-preview" | "lyria-3-pro-preview" | (string & {})) | undefined;
+    model?: ("gemini-3.5-flash" | "gemini-2.5-computer-use-preview-10-2025" | "gemini-2.5-flash" | "gemini-2.5-flash-image" | "gemini-2.5-flash-lite" | "gemini-2.5-flash-lite-preview-09-2025" | "gemini-2.5-flash-native-audio-preview-12-2025" | "gemini-2.5-flash-preview-09-2025" | "gemini-2.5-flash-preview-tts" | "gemini-2.5-pro" | "gemini-2.5-pro-preview-tts" | "gemini-3-flash-preview" | "gemini-3-pro-image-preview" | "gemini-3-pro-preview" | "gemini-3.1-pro-preview" | "gemini-3.1-flash-image-preview" | "gemini-3.1-flash-lite" | "gemini-3.1-flash-lite-preview" | "gemini-3.1-flash-tts-preview" | "lyria-3-clip-preview" | "lyria-3-pro-preview" | (string & {})) | undefined;
     agent?: ((string & {}) | "deep-research-pro-preview-12-2025" | "deep-research-preview-04-2026" | "deep-research-max-preview-04-2026" | "antigravity-preview-05-2026") | undefined;
     id: string;
     status: (string & {}) | "in_progress" | "requires_action" | "completed" | "failed" | "cancelled" | "incomplete" | "budget_exceeded";
@@ -94,22 +94,22 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
     usage?: {
         total_input_tokens?: number | undefined;
         input_tokens_by_modality?: Array<{
-            modality?: ((string & {}) | "text" | "image" | "audio" | "video" | "document") | undefined;
+            modality?: ("text" | (string & {}) | "image" | "audio" | "video" | "document") | undefined;
             tokens?: number | undefined;
         }> | undefined;
         total_cached_tokens?: number | undefined;
         cached_tokens_by_modality?: Array<{
-            modality?: ((string & {}) | "text" | "image" | "audio" | "video" | "document") | undefined;
+            modality?: ("text" | (string & {}) | "image" | "audio" | "video" | "document") | undefined;
             tokens?: number | undefined;
         }> | undefined;
         total_output_tokens?: number | undefined;
         output_tokens_by_modality?: Array<{
-            modality?: ((string & {}) | "text" | "image" | "audio" | "video" | "document") | undefined;
+            modality?: ("text" | (string & {}) | "image" | "audio" | "video" | "document") | undefined;
             tokens?: number | undefined;
         }> | undefined;
         total_tool_use_tokens?: number | undefined;
         tool_use_tokens_by_modality?: Array<{
-            modality?: ((string & {}) | "text" | "image" | "audio" | "video" | "document") | undefined;
+            modality?: ("text" | (string & {}) | "image" | "audio" | "video" | "document") | undefined;
             tokens?: number | undefined;
         }> | undefined;
         total_thought_tokens?: number | undefined;
@@ -119,7 +119,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
             count?: number | undefined;
         }> | undefined;
     } | undefined;
-    response_modalities?: Array<(string & {}) | "text" | "image" | "audio" | "video" | "document"> | undefined;
+    response_modalities?: Array<"text" | (string & {}) | "image" | "audio" | "video" | "document"> | undefined;
     response_mime_type?: string | undefined;
     previous_interaction_id?: string | undefined;
     environment_id?: string | undefined;
@@ -408,7 +408,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;
@@ -936,7 +936,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;
@@ -1438,7 +1438,7 @@ export declare function callGeminiAndLog(params?: any): Promise<Omit<{
         type: "url_context_result";
         result: Array<{
             url?: string | undefined;
-            status?: ((string & {}) | "success" | "error" | "paywall" | "unsafe") | undefined;
+            status?: ("error" | (string & {}) | "success" | "paywall" | "unsafe") | undefined;
         }>;
         is_error?: boolean | undefined;
         call_id: string;

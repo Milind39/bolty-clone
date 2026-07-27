@@ -327,7 +327,7 @@ export function Builder() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="flex-1 overflow-hidden grid grid-cols-4 gap-6 p-6">
-        <div className="col-span-1 space-y-6 overflow-auto">
+        {/* <div className="col-span-1 space-y-6 overflow-auto">
           <StepsList
             steps={steps}
             currentStep={currentStep}
@@ -350,7 +350,7 @@ export function Builder() {
               </button>
             </div>
           )}
-        </div>
+        </div> */}
         <div className="col-span-1 bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
           <FileExplorer
             files={files}
