@@ -13,7 +13,7 @@ const client = new genai.GoogleGenAI({apiKey: ApiKey});
 
 const app = express();
 app.use(express.json());
-const PORT = 4001;
+const PORT = 5000;
 app.use(cors());
 app.use(morgan("combined")) // This logs every single request automatically
 

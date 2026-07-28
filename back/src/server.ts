@@ -5,15 +5,212 @@ import Docker from "dockerode";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import morgan from "morgan";
+import { BASE_PROMPT, getSystemPrompt } from "./prompts";
+import { reactBasePrompt } from "./defaults/react";
+import { nodeBasePrompt } from "./defaults/node";
+import { callGeminiAndLog } from "./utility/loghelper";
 
 const app: Application = express();
 app.use(cors());
 app.use(express.json());
+app.use(cors());
+app.use(morgan("combined")) // This logs every single request automatically
+let requestCount = 0; // Global counter
+
+
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
+const ApiKey = process.env.GEMENI_API_KEY || "" ;
+
+
+/*******************************template***********************/
+
+app.post("/template", async(req, res) => {
+    const prompt = req.body.prompt.toLowerCase();
+    /*****************Below we ask whether its react or node to llm ********************/
+    //  const response = await callGeminiAndLog({
+    //         model: "gemini-3.5-flash",
+    //         input: [
+    //             { type: "text", text: prompt },
+    //         ],
+    //         system_instruction: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
+    //  });
+    // console.log(response);
+
+
+
+    // 1. Local Classification (0 cost, instant, no rate limit)
+    let answer = "node"; // Default to node
+    if (prompt.includes("react") || prompt.includes("frontend") || prompt.includes("ui")) {
+        answer = "react";
+    }
+
+    console.log("Classified as:", answer);
+
+    // const answer = response.output_text?.trim().toLowerCase();  // either react or node
+    if (answer === "react") {
+
+        res.json({
+            prompt: [BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+            uiPrompt: reactBasePrompt,
+         });
+
+    }
+    else if (answer === "node") {
+    
+        res.json({
+            prompt: `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+            uiPrompt: nodeBasePrompt
+        });
+    
+    }
+    else {
+    
+        return res.status(403).json({ error: "Invalid project type" });
+    }
+
+
+});
+
+
+
+/**********************chat***********************/
+
+
+app.post("/chat", async (req, res) => {
+    requestCount++;
+    console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
+
+    const { userTask, boilerplate } = req.body.prompt;
+    const finalPrompt = `
+[INSTRUCTIONS]
+You are an expert developer. You are provided with existing project files
+within <project_files> tags. Your task is defined within <user_request> tags.
+- IF the task is simple (like "Create a todo app"), PROVIDE A SIMPLE IMPLEMENTATION.
+- DO NOT invent complex features, analytics dashboards, or platforms.
+- Focus ONLY on the requested functionality.
+- Prioritize <user_request> over any assumptions about the project's purpose.
+- Treat each <user_request> as a fresh task. Do not carry over architectural
+  complexity from previous turns unless explicitly asked to modify existing features.
+
+<project_files>
+${boilerplate || ""}
+</project_files>
+
+<user_request>
+${userTask}
+</user_request>
+`;
+    
+    // Set headers to allow streaming chunks
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    try {
+        const response = await callGeminiAndLog({
+            model: "gemini-3.5-flash", // Updated to standard Gemini flash model syntax
+            input: [
+                { type: "text", text: finalPrompt },
+            ],
+            system_instruction: typeof getSystemPrompt === "function" ? getSystemPrompt() : "You are a helpful coding assistant.",
+            stream: true,
+        });
+
+        console.log("Stream object type:", typeof response);
+
+        // Pipe the stream events directly to the HTTP response
+        for await (const event of (response as any)) {
+            console.log("Processing event type:", event.event_type);
+
+            // Check for API-level errors inside the event stream
+            if (event.event_type === "error") {
+                console.error("Gemini API stream error:", event.error);
+                res.write(JSON.stringify({
+                    error: true,
+                    message: event.error?.message || "Unknown API Error"
+                }));
+                break;
+            }
+
+            // Extract text chunks from the delta structure
+            if (event.event_type === "step.delta" && event.delta?.type === "text") {
+                res.write(event.delta.text);
+            }
+            // Fallback check if your wrapper uses standard text content deltas
+            else if (event.text) {
+                res.write(event.text);
+            }
+        }
+        console.log("Stream successfully completed and sent.");
+    }
+    catch (error: any) {
+        console.error("Fatal Stream Exception:", error);
+    
+        // If headers haven't gone out yet, send standard JSON error code
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Internal Server Error", message: error.message });
+        } else {
+            // Headers already sent (mid-stream), communicate failure over the stream payload
+            res.write(JSON.stringify({ error: true, message: "Stream interrupted due to server error" }));
+        }
+    }
+    finally {
+        res.end(); // Always close the HTTP connection
+    }
+});
+
+
+/****************************MOCK RESPONSE******************* */
+
+// app.post("/chat", async (req, res) => {
+//     requestCount++;
+//     console.log(`[REQUEST #${requestCount}] Received at ${new Date().toISOString()}`);
+
+
+//     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+//     res.setHeader('Transfer-Encoding', 'chunked');
+
+//     // Your dummy response formatted with the Bolt artifact/action tags or step XML
+//     const dummyXmlResponse = `
+// <boltArtifact id="project-import" title="Mock Project">
+//   <boltAction type="file" filePath="src/App.tsx">
+//     import React from 'react';
+//     export default function App() {
+//       return <div className="p-4 text-white bg-slate-900">Hello from Mock Stream!</div>;
+//     }
+//   </boltAction>
+//   <boltAction type="file" filePath="package.json">
+//     {
+//       "name": "mock-app",
+//       "version": "1.0.0"
+//     }
+//   </boltAction>
+// </boltArtifact>
+//     `.trim();
+
+//     try {
+//         // Simulate streaming chunk-by-chunk with a slight delay
+//         const chunkSize = 15; // characters per chunk
+//         for (let i = 0; i < dummyXmlResponse.length; i += chunkSize) {
+//             const chunk = dummyXmlResponse.slice(i, i + chunkSize);
+//             res.write(chunk);
+//             // Wait 50ms to realistically simulate network token streaming
+//             await new Promise((resolve) => setTimeout(resolve, 50));
+//         }
+//     } catch (error) {
+//         console.error("Mock stream error:", error);
+//     } finally {
+//         res.end();
+//     }
+// });
+
+
+/*********************Docker***********************/
+
 
 const docker = new Docker(); // Automatically connects to your running Docker Desktop
 const WORKSPACE_DIR = path.resolve("./workspace");
@@ -65,7 +262,7 @@ io.on("connection", async (socket: Socket) => {
       HostConfig: {
         Binds: [`${WORKSPACE_DIR}:/app`],
         PortBindings: {
-          "3000/tcp": [{ HostPort: "3000" }]
+          "3000/tcp": [{ HostPort: "" }]
         }
       },
       ExposedPorts: {
@@ -76,13 +273,19 @@ io.on("connection", async (socket: Socket) => {
     await container.start();
     console.log(`Docker container started: ${container.id.substring(0, 12)}`);
 
-    const execStream = await container.attach({
-      stream: true,
-      stdout: true,
-      stderr: true,
-      stdin: true
+// Use docker exec stream for reliable interactive shell input/output piping
+    const exec = await container.exec({
+      Cmd: ["sh"],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
     });
 
+    const execStream = await exec.start({
+      hijack: true,
+      stdin: true,
+    });
     // Stream container shell output to frontend Xterm terminal
     execStream.on("data", (chunk: Buffer) => {
       socket.emit("terminal:output", chunk.toString());
@@ -112,7 +315,7 @@ io.on("connection", async (socket: Socket) => {
   }
 });
 
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Docker Terminal backend running on http://localhost:${PORT}`);
 });

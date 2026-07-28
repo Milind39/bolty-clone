@@ -100,6 +100,8 @@ export function Builder() {
       if (flatCachedFiles.length > 0) {
         const treeFiles = buildFileTree(flatCachedFiles);
         setFiles(treeFiles);
+        // ADD THIS LINE HERE:
+        await syncFilesToBackend(flatCachedFiles);
       }
     } else {
       setLoading(true);
@@ -192,6 +194,12 @@ export function Builder() {
         const treeFiles = buildFileTree(flatFiles);
         setFiles(treeFiles);
 
+        await syncFilesToBackend(flatFiles);
+
+        console.log(
+          "Files are now synced inside the Docker container terminal workspace!",
+        );
+
         setLlmMessages([
           { role: "user", content: savedPrompt },
           { role: "assistant", content: fullResponse },
@@ -274,6 +282,8 @@ export function Builder() {
               }),
             );
 
+            // ADD THIS SYNC CALL RIGHT HERE INSIDE THE STATE SETTER OR RIGHT AFTER:
+            syncFilesToBackend(mergedFlat);
             return buildFileTree(mergedFlat);
           });
         }
@@ -330,7 +340,7 @@ export function Builder() {
     flatFiles: Array<{ path: string; content: string }>,
   ) {
     try {
-      await fetch("http://localhost:4001/api/save-files", {
+      await fetch("http://localhost:5000/api/save-files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: flatFiles }),
@@ -391,7 +401,7 @@ export function Builder() {
               </>
             ) : activeTab === "preview" ? (
               <iframe
-                src="http://localhost:3000"
+                src="http://localhost:3001"
                 className="w-full h-full border-0 bg-white rounded"
                 title="Live Preview"
               />

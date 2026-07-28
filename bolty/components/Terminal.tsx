@@ -7,26 +7,42 @@ import "xterm/css/xterm.css";
 
 export function Terminal() {
   const terminalRef = useRef<HTMLDivElement>(null);
+  const isInitialized = useRef(false);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    // Prevent double-initialization in React Strict Mode
+    if (!terminalRef.current || isInitialized.current) return;
+    isInitialized.current = true;
 
     const term = new XTerminal({
       cursorBlink: true,
-      theme: { background: "#090d16" },
+      theme: {
+        background: "#090d16",
+        foreground: "#f8fafc",
+      },
     });
+
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    term.open(terminalRef.current);
-    fitAddon.fit();
+    // Ensure DOM is fully painted before opening Xterm
+    const timer = setTimeout(() => {
+      if (terminalRef.current) {
+        term.open(terminalRef.current);
+        try {
+          fitAddon.fit();
+        } catch (e) {
+          console.error("Fit addon error:", e);
+        }
+      }
+    }, 50);
 
-    // Connect to your backend container gateway
-    const socket = io("http://localhost:4001");
+    // Connect to backend Express / Socket.io server
+    const socket = io("http://localhost:5000");
     socketRef.current = socket;
 
-    socket.on("terminal:output", (data) => {
+    socket.on("terminal:output", (data: string) => {
       term.write(data);
     });
 
@@ -35,8 +51,10 @@ export function Terminal() {
     });
 
     return () => {
+      clearTimeout(timer);
       socket.disconnect();
       term.dispose();
+      isInitialized.current = false;
     };
   }, []);
 
