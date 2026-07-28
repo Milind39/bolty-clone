@@ -281,19 +281,19 @@ export function Builder() {
 
       checkForApiError(fullResponse);
 
-      if (typeof window.writeToTerminal === "function") {
-        setTimeout(() => {
-          window.writeToTerminal?.("\x1b[36m$ npm install\x1b[0m");
-          window.writeToTerminal?.("packages installed successfully.");
-        }, 500);
+      // if (typeof window.writeToTerminal === "function") {
+      //   setTimeout(() => {
+      //     window.writeToTerminal?.("\x1b[36m$ npm install\x1b[0m");
+      //     window.writeToTerminal?.("packages installed successfully.");
+      //   }, 500);
 
-        setTimeout(() => {
-          window.writeToTerminal?.("\x1b[36m$ npm run dev\x1b[0m");
-          window.writeToTerminal?.(
-            "> local dev server running on port 3000 🚀",
-          );
-        }, 1200);
-      }
+      //   setTimeout(() => {
+      //     window.writeToTerminal?.("\x1b[36m$ npm run dev\x1b[0m");
+      //     window.writeToTerminal?.(
+      //       "> local dev server running on port 3000 🚀",
+      //     );
+      //   }, 1200);
+      // }
 
       const newSteps = parseXml(fullResponse);
       setSteps((s) => [
@@ -323,6 +323,25 @@ export function Builder() {
     });
     return acc;
   };
+
+  // function that pushes your flat files to your backend whenever files change:
+
+  async function syncFilesToBackend(
+    flatFiles: Array<{ path: string; content: string }>,
+  ) {
+    try {
+      await fetch("http://localhost:4001/api/save-files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: flatFiles }),
+      });
+    } catch (err) {
+      console.error(
+        "Failed to sync files to backend container workspace:",
+        err,
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
@@ -366,14 +385,16 @@ export function Builder() {
                 <div className="h-[100%] w-full overflow-hidden rounded border border-gray-800">
                   <CodeEditor file={selectedFile} />
                 </div>
-                {/* <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
+                <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
                   <Terminal />
-                </div> */}
+                </div>
               </>
             ) : activeTab === "preview" ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                Preview disabled (WebContainer removed)
-              </div>
+              <iframe
+                src="http://localhost:3000"
+                className="w-full h-full border-0 bg-white rounded"
+                title="Live Preview"
+              />
             ) : (
               <div className="h-full w-full">
                 <Terminal />
