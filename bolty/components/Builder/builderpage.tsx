@@ -29,9 +29,14 @@ export function Builder() {
   const [files, setFiles] = useState<FileItem[]>([]);
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
+  // const [activeTab, setActiveTab] = useState<"code" | "preview">("code");
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
+
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "terminal">(
+    "code",
+  );
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Helper function to safely detect and throw API errors from stream text
   const checkForApiError = (text: string) => {
@@ -353,6 +358,13 @@ export function Builder() {
     }
   }
 
+  // This function is triggered automatically when Vite outputs the local url
+  const handleServerReady = (url: string) => {
+    setPreviewUrl(url);
+    // Optional: Automatically switch to the preview tab
+    setActiveTab("preview");
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="flex-1 overflow-hidden grid grid-cols-4 gap-4 p-4">
@@ -396,18 +408,20 @@ export function Builder() {
                   <CodeEditor file={selectedFile} />
                 </div>
                 <div className="h-[35%] w-full overflow-hidden rounded border border-gray-800">
-                  <Terminal />
+                  {/* Pass the server ready handler here */}
+                  <Terminal onServerReady={handleServerReady} />
                 </div>
               </>
             ) : activeTab === "preview" ? (
               <iframe
-                src="http://localhost:3001"
+                src={previewUrl || "http://localhost:3001"}
                 className="w-full h-full border-0 bg-white rounded"
                 title="Live Preview"
               />
             ) : (
               <div className="h-full w-full">
-                <Terminal />
+                {/* Pass the server ready handler here too */}
+                <Terminal onServerReady={handleServerReady} />
               </div>
             )}
           </div>

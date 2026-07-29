@@ -5,7 +5,11 @@ import { FitAddon } from "xterm-addon-fit";
 import { io, Socket } from "socket.io-client";
 import "xterm/css/xterm.css";
 
-export function Terminal() {
+interface TerminalProps {
+  onServerReady?: (url: string) => void;
+}
+
+export function Terminal({ onServerReady }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef(false);
   const socketRef = useRef<Socket | null>(null);
@@ -44,7 +48,17 @@ export function Terminal() {
 
     socket.on("terminal:output", (data: string) => {
       term.write(data);
-    });
+
+      // Check if the terminal output contains the Vite local server URL
+      if (
+        data.includes("http://localhost:3001") ||
+        data.includes("http://127.0.0.1:3001")
+      ) {
+        if (onServerReady) {
+          onServerReady("http://localhost:3001");
+        }
+      }
+    }); // <-- Fixed syntax error here (removed rogue semicolon/brace)
 
     term.onData((data) => {
       socket.emit("terminal:input", data);
@@ -56,7 +70,7 @@ export function Terminal() {
       term.dispose();
       isInitialized.current = false;
     };
-  }, []);
+  }, [onServerReady]);
 
   return <div ref={terminalRef} className="h-full w-full p-2 bg-[#090d16]" />;
 }

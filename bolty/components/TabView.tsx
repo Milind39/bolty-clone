@@ -2,8 +2,8 @@ import React from "react";
 import { Code2, Eye } from "lucide-react";
 
 interface TabViewProps {
-  activeTab: "code" | "preview";
-  onTabChange: (tab: "code" | "preview") => void;
+  activeTab: "code" | "preview" | "terminal";
+  onTabChange: (tab: "code" | "preview" | "terminal") => void;
 }
 
 export function TabView({ activeTab, onTabChange }: TabViewProps) {
