@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import { Terminal as XTerminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
-import { io, Socket } from "socket.io-client";
+import { socket } from "@/lib/socket"; // Import the shared singleton socket
 import "xterm/css/xterm.css";
 
 interface TerminalProps {
@@ -12,7 +12,6 @@ interface TerminalProps {
 export function Terminal({ onServerReady }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const termInstanceRef = useRef<XTerminal | null>(null);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -43,10 +42,8 @@ export function Terminal({ onServerReady }: TerminalProps) {
       }
     }, 100);
 
-    const socket = io("http://localhost:5000");
-    socketRef.current = socket;
-
-    socket.on("terminal:output", (data: string) => {
+    // Use the shared global socket connection instead of spawning a new one
+    const handleOutput = (data: string) => {
       term.write(data);
 
       if (
@@ -57,15 +54,21 @@ export function Terminal({ onServerReady }: TerminalProps) {
           onServerReady("http://localhost:3001");
         }
       }
-    });
+    };
 
-    term.onData((data) => {
+    socket.on("terminal:output", handleOutput);
+
+    const handleData = (data: string) => {
       socket.emit("terminal:input", data);
-    });
+    };
+
+    term.onData(handleData);
 
     return () => {
       clearTimeout(timer);
-      socket.disconnect();
+      // Clean up event listeners so they don't stack up on re-renders,
+      // but do NOT call socket.disconnect() so the connection stays alive globally.
+      socket.off("terminal:output", handleOutput);
       term.dispose();
       termInstanceRef.current = null;
     };

@@ -314,67 +314,59 @@ io.on("connection", async (socket: Socket) => {
   console.log(`Client connected: ${socket.id}`);
 
   if (!globalContainer)
-    try {
-      // Pull or use node:18-alpine, create container, map workspace folder, and expose port 3000
-      globalContainer = await docker.createContainer({
-        Image: "node:18-alpine",
-        Cmd: ["sh"],
-        Tty: true,
-        OpenStdin: true,
-        StdinOnce: false,
-        WorkingDir: "/app",
-        HostConfig: {
-          Binds: [`${WORKSPACE_DIR}:/app`],
-          PortBindings: {
-            "3000/tcp": [{ HostPort: "3001" }]
-          }
-        },
-        ExposedPorts: {
-          "3000/tcp": {}
+  try {
+    // Pull or use node:18-alpine, create container, map workspace folder, and expose port 3000
+    globalContainer = await docker.createContainer({
+      Image: "node:18-alpine",
+      Cmd: ["sh"],
+      Tty: true,
+      OpenStdin: true,
+      StdinOnce: false,
+      WorkingDir: "/app",
+      HostConfig: {
+        Binds: [`${WORKSPACE_DIR}:/app`],
+        PortBindings: {
+          "3000/tcp": [{ HostPort: "" }]
         }
-      });
+      },
+      ExposedPorts: {
+        "3000/tcp": {}
+      }
+    });
 
-      await globalContainer.start();
-      console.log(`Docker container started: ${globalContainer.id.substring(0, 12)}`);
+    await globalContainer.start();
+    console.log(`Docker container started: ${globalContainer.id.substring(0, 12)}`);
 
-      // Use docker exec stream for reliable interactive shell input/output piping
-      const exec = await globalContainer.exec({
-        Cmd: ["sh"],
-        AttachStdin: true,
-        AttachStdout: true,
-        AttachStderr: true,
-        Tty: true,
-      });
+// Use docker exec stream for reliable interactive shell input/output piping
+    const exec = await globalContainer.exec({
+      Cmd: ["sh"],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+    });
 
-      const execStream = await exec.start({
-        hijack: true,
-        stdin: true,
-      });
-      // Stream container shell output to frontend Xterm terminal
-      execStream.on("data", (chunk: Buffer) => {
-        socket.emit("terminal:output", chunk.toString());
-      });
+    const execStream = await exec.start({
+      hijack: true,
+      stdin: true,
+    });
+    // Stream container shell output to frontend Xterm terminal
+    execStream.on("data", (chunk: Buffer) => {
+      socket.emit("terminal:output", chunk.toString());
+    });
 
-      // Receive keystrokes/commands from frontend terminal and pass to container
-      socket.on("terminal:input", (input: string) => {
-        execStream.write(input);
-      });
+    // Receive keystrokes/commands from frontend terminal and pass to container
+    socket.on("terminal:input", (input: string) => {
+      execStream.write(input);
+    });
 
-      // // Destroy container when user closes session or disconnects
-      // socket.on("disconnect", async () => {
-      //   if (globalContainer) {
-      //     try {
-      //       await globalContainer.stop();
-      //       await globalContainer.remove();
-      //       console.log("Container stopped and cleaned up.");
-      //     } catch (e) {
-      //       console.error("Cleanup error:", e);
-      //     }
-      //   }
-      // });
-    socket.on("disconnect", () => {
+    // Destroy container when user closes session or disconnects
+    socket.on("disconnect", async () => {
       console.log(`Client disconnected: ${socket.id} (Container persistent)`);
     });
+      
+
+
 
   } catch (err: any) {
     console.error("Docker container error:", err);
