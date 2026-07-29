@@ -305,68 +305,75 @@ app.post("/api/save-files", (req: Request, res: Response) => {
   }
 });
 
+// Track active containers per socket or globally for this clone demo
+let globalContainer: Docker.Container | null = null;
+
+
 // 2. WebSocket handler to spawn and stream a Docker container terminal
 io.on("connection", async (socket: Socket) => {
   console.log(`Client connected: ${socket.id}`);
-  let container: Docker.Container | null = null;
 
-  try {
-    // Pull or use node:18-alpine, create container, map workspace folder, and expose port 3000
-    container = await docker.createContainer({
-      Image: "node:18-alpine",
-      Cmd: ["sh"],
-      Tty: true,
-      OpenStdin: true,
-      StdinOnce: false,
-      WorkingDir: "/app",
-      HostConfig: {
-        Binds: [`${WORKSPACE_DIR}:/app`],
-        PortBindings: {
-          "3000/tcp": [{ HostPort: "" }]
+  if (!globalContainer)
+    try {
+      // Pull or use node:18-alpine, create container, map workspace folder, and expose port 3000
+      globalContainer = await docker.createContainer({
+        Image: "node:18-alpine",
+        Cmd: ["sh"],
+        Tty: true,
+        OpenStdin: true,
+        StdinOnce: false,
+        WorkingDir: "/app",
+        HostConfig: {
+          Binds: [`${WORKSPACE_DIR}:/app`],
+          PortBindings: {
+            "3000/tcp": [{ HostPort: "3001" }]
+          }
+        },
+        ExposedPorts: {
+          "3000/tcp": {}
         }
-      },
-      ExposedPorts: {
-        "3000/tcp": {}
-      }
-    });
+      });
 
-    await container.start();
-    console.log(`Docker container started: ${container.id.substring(0, 12)}`);
+      await globalContainer.start();
+      console.log(`Docker container started: ${globalContainer.id.substring(0, 12)}`);
 
-// Use docker exec stream for reliable interactive shell input/output piping
-    const exec = await container.exec({
-      Cmd: ["sh"],
-      AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: true,
-    });
+      // Use docker exec stream for reliable interactive shell input/output piping
+      const exec = await globalContainer.exec({
+        Cmd: ["sh"],
+        AttachStdin: true,
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: true,
+      });
 
-    const execStream = await exec.start({
-      hijack: true,
-      stdin: true,
-    });
-    // Stream container shell output to frontend Xterm terminal
-    execStream.on("data", (chunk: Buffer) => {
-      socket.emit("terminal:output", chunk.toString());
-    });
+      const execStream = await exec.start({
+        hijack: true,
+        stdin: true,
+      });
+      // Stream container shell output to frontend Xterm terminal
+      execStream.on("data", (chunk: Buffer) => {
+        socket.emit("terminal:output", chunk.toString());
+      });
 
-    // Receive keystrokes/commands from frontend terminal and pass to container
-    socket.on("terminal:input", (input: string) => {
-      execStream.write(input);
-    });
+      // Receive keystrokes/commands from frontend terminal and pass to container
+      socket.on("terminal:input", (input: string) => {
+        execStream.write(input);
+      });
 
-    // Destroy container when user closes session or disconnects
-    socket.on("disconnect", async () => {
-      if (container) {
-        try {
-          await container.stop();
-          await container.remove();
-          console.log("Container stopped and cleaned up.");
-        } catch (e) {
-          console.error("Cleanup error:", e);
-        }
-      }
+      // // Destroy container when user closes session or disconnects
+      // socket.on("disconnect", async () => {
+      //   if (globalContainer) {
+      //     try {
+      //       await globalContainer.stop();
+      //       await globalContainer.remove();
+      //       console.log("Container stopped and cleaned up.");
+      //     } catch (e) {
+      //       console.error("Cleanup error:", e);
+      //     }
+      //   }
+      // });
+    socket.on("disconnect", () => {
+      console.log(`Client disconnected: ${socket.id} (Container persistent)`);
     });
 
   } catch (err: any) {

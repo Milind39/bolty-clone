@@ -11,13 +11,14 @@ interface TerminalProps {
 
 export function Terminal({ onServerReady }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const isInitialized = useRef(false);
+  const termInstanceRef = useRef<XTerminal | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Prevent double-initialization in React Strict Mode
-    if (!terminalRef.current || isInitialized.current) return;
-    isInitialized.current = true;
+    if (!terminalRef.current) return;
+
+    // Clear any leftover canvas elements from previous unmounts
+    terminalRef.current.innerHTML = "";
 
     const term = new XTerminal({
       cursorBlink: true,
@@ -27,29 +28,27 @@ export function Terminal({ onServerReady }: TerminalProps) {
       },
     });
 
+    termInstanceRef.current = term;
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    // Ensure DOM is fully painted before opening Xterm
-    const timer = setTimeout(() => {
-      if (terminalRef.current) {
-        term.open(terminalRef.current);
-        try {
-          fitAddon.fit();
-        } catch (e) {
-          console.error("Fit addon error:", e);
-        }
-      }
-    }, 50);
+    term.open(terminalRef.current);
 
-    // Connect to backend Express / Socket.io server
+    // Slight delay to safely calculate dimensions post-paint
+    const timer = setTimeout(() => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        // Suppress fit race conditions safely
+      }
+    }, 100);
+
     const socket = io("http://localhost:5000");
     socketRef.current = socket;
 
     socket.on("terminal:output", (data: string) => {
       term.write(data);
 
-      // Check if the terminal output contains the Vite local server URL
       if (
         data.includes("http://localhost:3001") ||
         data.includes("http://127.0.0.1:3001")
@@ -58,7 +57,7 @@ export function Terminal({ onServerReady }: TerminalProps) {
           onServerReady("http://localhost:3001");
         }
       }
-    }); // <-- Fixed syntax error here (removed rogue semicolon/brace)
+    });
 
     term.onData((data) => {
       socket.emit("terminal:input", data);
@@ -68,9 +67,14 @@ export function Terminal({ onServerReady }: TerminalProps) {
       clearTimeout(timer);
       socket.disconnect();
       term.dispose();
-      isInitialized.current = false;
+      termInstanceRef.current = null;
     };
   }, [onServerReady]);
 
-  return <div ref={terminalRef} className="h-full w-full p-2 bg-[#090d16]" />;
+  return (
+    <div
+      ref={terminalRef}
+      className="h-full w-full p-2 bg-[#090d16] overflow-hidden"
+    />
+  );
 }
