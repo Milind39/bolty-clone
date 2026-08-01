@@ -46,13 +46,20 @@ export function Terminal({ onServerReady }: TerminalProps) {
     const handleOutput = (data: string) => {
       term.write(data);
 
-      if (
-        data.includes("http://localhost:3001") ||
-        data.includes("http://127.0.0.1:3001")
-      ) {
-        if (onServerReady) {
-          onServerReady("http://localhost:3001");
-        }
+      // Strip ANSI escape codes so matching works reliably
+      const cleanData = data.replace(
+        /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+        "",
+      );
+
+      // Look for any standard local URL emitted by Vite
+      const match = cleanData.match(
+        /(https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):\d+)/,
+      );
+      if (match && onServerReady) {
+        // Map any internal loopback or 0.0.0.0 to localhost or window host for the iframe
+        const detectedUrl = match[1].replace("0.0.0.0", "localhost");
+        onServerReady(detectedUrl);
       }
     };
 

@@ -414,7 +414,10 @@ export function Builder() {
               </>
             ) : activeTab === "preview" ? (
               <iframe
-                src={previewUrl || "http://localhost:3001"}
+                src={
+                  previewUrl ||
+                  `${window.location.protocol}//${window.location.hostname}:3001`
+                }
                 className="w-full h-full border-0 bg-white rounded"
                 title="Live Preview"
               />

@@ -184,12 +184,15 @@ const dummyXmlResponse = `
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.1",
+  "postcss": "^8.4.35",
+  "autoprefixer": "^10.4.18"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
@@ -207,7 +210,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 3001
+    port: 5173,
+    strictPort: true,
+    allowedHosts: true, // Allows proxy routing inside container environments
   }
 });
   </boltAction>
