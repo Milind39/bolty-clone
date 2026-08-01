@@ -331,11 +331,11 @@ io.on("connection", async (socket: Socket) => {
       HostConfig: {
         Binds: [`${WORKSPACE_DIR}:/app`],
         PortBindings: {
-          "3000/tcp": [{ HostPort: "" }]
+          "5173/tcp": [{ HostPort: "5173" }]
         }
       },
       ExposedPorts: {
-        "3000/tcp": {}
+        "5173/tcp": {}
       }
     });
 

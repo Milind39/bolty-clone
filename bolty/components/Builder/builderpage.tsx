@@ -416,7 +416,7 @@ export function Builder() {
               <iframe
                 src={
                   previewUrl ||
-                  `${window.location.protocol}//${window.location.hostname}:3001`
+                  `${window.location.protocol}//${window.location.hostname}:5173`
                 }
                 className="w-full h-full border-0 bg-white rounded"
                 title="Live Preview"
